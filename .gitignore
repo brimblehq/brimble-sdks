@@ -1,0 +1,18 @@
+# Node
+node_modules/
+dist/
+*.tgz
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+
+# Go
+coverage.out
+
+# macOS
+.DS_Store
