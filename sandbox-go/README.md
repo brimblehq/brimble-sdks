@@ -28,20 +28,24 @@ func main() {
 		panic(err)
 	}
 
-	handle, err := client.Sandboxes.CreateReady(
-		ctx,
-		sandbox.CreateSandboxRequest{
-			Template:        "node-22",
-			Persistent:      ptrBool(true),
-			PersistentDiskGB: ptrInt(20),
-		},
-		nil,
-	)
+		handle, err := client.Sandboxes.CreateReady(
+			ctx,
+			sandbox.CreateSandboxRequest{
+				Template:        "node-22",
+				Persistent:      ptrBool(true),
+				PersistentDiskGB: ptrInt(20),
+				MountPath:       "/workspace",
+			},
+			nil,
+		)
 	if err != nil {
 		panic(err)
 	}
 
-result, err := handle.Exec(ctx, sandbox.ExecInput{Cmd: "node -v"})
+result, err := handle.Exec(ctx, sandbox.ExecInput{
+	Cmd: "node -v",
+	Env: map[string]string{"NODE_ENV": "production"},
+})
 if err != nil {
 	panic(err)
 }

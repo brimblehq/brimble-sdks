@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 )
+
+var mountPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._/-]*$`)
 
 // SandboxesResource manages sandbox lifecycle operations.
 type SandboxesResource struct {
@@ -16,8 +19,12 @@ type SandboxesResource struct {
 // Region is optional; empty or "auto" resolves the first available region.
 func (r *SandboxesResource) Create(ctx context.Context, input CreateSandboxRequest, options ...RequestOptions) (*SandboxHandle, error) {
 	requestOptions := firstOptions(options...)
+	applyMountPathDefault(&input)
+	if err := validateMountPath(input); err != nil {
+		return nil, err
+	}
 
-	resolvedRegion, err := r.resolveRegionID(ctx, input.Region, requestOptions)
+	resolvedRegion, err := r.resolveCreateRegionID(ctx, input, requestOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -297,6 +304,7 @@ func (r *SandboxesResource) QuickstartNode(ctx context.Context, region string, w
 		Template:         "node-22",
 		Persistent:       &persistent,
 		PersistentDiskGB: &disk,
+		MountPath:        "/workspace",
 	}, options...)
 	if err != nil {
 		return nil, err
@@ -321,6 +329,7 @@ func (r *SandboxesResource) QuickstartPython(ctx context.Context, region string,
 		Template:         "python-3.12",
 		Persistent:       &persistent,
 		PersistentDiskGB: &disk,
+		MountPath:        "/workspace",
 	}, options...)
 	if err != nil {
 		return nil, err
@@ -348,6 +357,60 @@ func (r *SandboxesResource) resolveRegionID(ctx context.Context, region string, 
 		return "", fmt.Errorf("no sandbox regions available for this account")
 	}
 	return regions.Regions[0].ID, nil
+}
+
+func (r *SandboxesResource) resolveCreateRegionID(ctx context.Context, input CreateSandboxRequest, requestOptions *RequestOptions) (string, error) {
+	if input.Region != "" && input.Region != "auto" {
+		return input.Region, nil
+	}
+
+	if input.VolumeID != "" {
+		volume, err := r.client.Volumes.Get(ctx, input.VolumeID, derefOptions(requestOptions)...)
+		if err != nil {
+			return "", err
+		}
+		if volume.Region != nil && volume.Region.ID != "" {
+			return volume.Region.ID, nil
+		}
+
+		return "", fmt.Errorf("unable to infer region from attached volume; pass `region` explicitly")
+	}
+
+	return r.resolveRegionID(ctx, "", requestOptions)
+}
+
+func validateMountPath(input CreateSandboxRequest) error {
+	hasPersistent := input.Persistent != nil && *input.Persistent
+	hasVolume := input.VolumeID != ""
+	hasStorage := hasPersistent || hasVolume
+	hasMountPath := input.MountPath != ""
+
+	if hasStorage && !hasMountPath {
+		return fmt.Errorf("mountPath is required when using persistent storage (`persistent`/`persistentDiskGB` or `volumeId`)")
+	}
+
+	if !hasMountPath {
+		return nil
+	}
+
+	if !mountPathPattern.MatchString(input.MountPath) || input.MountPath == "/" {
+		return fmt.Errorf("mountPath must match ^/[A-Za-z0-9._/-]*$ and cannot be \"/\"")
+	}
+
+	if !hasPersistent && !hasVolume {
+		return fmt.Errorf("mountPath requires either `persistent: true` or `volumeId`")
+	}
+
+	return nil
+}
+
+func applyMountPathDefault(input *CreateSandboxRequest) {
+	hasPersistent := input.Persistent != nil && *input.Persistent
+	hasVolume := input.VolumeID != ""
+	hasStorage := hasPersistent || hasVolume
+	if hasStorage && input.MountPath == "" {
+		input.MountPath = "/workspace"
+	}
 }
 
 func firstOptions(options ...RequestOptions) *RequestOptions {

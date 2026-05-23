@@ -129,6 +129,7 @@ type CreateSandboxRequest struct {
 	Persistent        *bool          `json:"persistent,omitempty"`
 	PersistentDiskGB  *int           `json:"persistentDiskGB,omitempty"`
 	VolumeID          string         `json:"volumeId,omitempty"`
+	MountPath         string         `json:"mountPath,omitempty"`
 	FromSnapshot      string         `json:"fromSnapshot,omitempty"`
 	SnapshotMode      SnapshotMode   `json:"snapshotMode,omitempty"`
 	SnapshotFrequency string         `json:"snapshotFrequency,omitempty"`
@@ -181,18 +182,20 @@ type AckMessage struct {
 }
 
 type ExecInput struct {
-	Cmd            string `json:"cmd"`
-	TimeoutSeconds *int   `json:"timeout_seconds,omitempty"`
-	Cwd            string `json:"cwd,omitempty"`
-	Stream         *bool  `json:"stream,omitempty"`
+	Cmd            string            `json:"cmd"`
+	TimeoutSeconds *int              `json:"timeout_seconds,omitempty"`
+	Cwd            string            `json:"cwd,omitempty"`
+	Stream         *bool             `json:"stream,omitempty"`
+	Env            map[string]string `json:"env,omitempty"`
 }
 
 type CodeInput struct {
-	Language       CodeLanguage `json:"language"`
-	Code           string       `json:"code"`
-	TimeoutSeconds *int         `json:"timeout_seconds,omitempty"`
-	Cwd            string       `json:"cwd,omitempty"`
-	Stream         *bool        `json:"stream,omitempty"`
+	Language       CodeLanguage      `json:"language"`
+	Code           string            `json:"code"`
+	TimeoutSeconds *int              `json:"timeout_seconds,omitempty"`
+	Cwd            string            `json:"cwd,omitempty"`
+	Stream         *bool             `json:"stream,omitempty"`
+	Env            map[string]string `json:"env,omitempty"`
 }
 
 type ExecResult struct {

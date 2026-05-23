@@ -7,6 +7,8 @@ import (
 
 // SandboxScope wraps runtime operations for a specific sandbox id.
 type SandboxScope struct {
+	client     *Client
+	sandboxID  string
 	ExecRunner *ExecResource
 	Files      *FilesResource
 	StatsAPI   *StatsResource
@@ -15,6 +17,8 @@ type SandboxScope struct {
 
 func newSandboxScope(client *Client, sandboxID string) *SandboxScope {
 	return &SandboxScope{
+		client:     client,
+		sandboxID:  sandboxID,
 		ExecRunner: &ExecResource{client: client, sandboxID: sandboxID},
 		Files:      &FilesResource{client: client, sandboxID: sandboxID},
 		StatsAPI:   &StatsResource{client: client, sandboxID: sandboxID},
@@ -70,4 +74,9 @@ func (s *SandboxScope) CreateSnapshot(ctx context.Context, input CreateSnapshotI
 // ListSnapshots lists snapshots for this sandbox.
 func (s *SandboxScope) ListSnapshots(ctx context.Context, query Pagination) (*Paginated[Snapshot], error) {
 	return s.Snapshots.List(ctx, query)
+}
+
+// Destroy destroys this sandbox.
+func (s *SandboxScope) Destroy(ctx context.Context, options ...RequestOptions) error {
+	return s.client.Sandboxes.Destroy(ctx, s.sandboxID, options...)
 }

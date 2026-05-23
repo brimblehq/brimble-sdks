@@ -148,7 +148,10 @@ func TestIntegrationRuntimeSnapshotFlow(t *testing.T) {
 		_ = handle.Destroy(ctx)
 	}()
 
-	execResult, err := handle.Exec(ctx, ExecInput{Cmd: "echo go-sdk-test"})
+	execResult, err := handle.Exec(ctx, ExecInput{
+		Cmd: "echo \"$SDK_ENV_TEST\"",
+		Env: map[string]string{"SDK_ENV_TEST": "go-sdk-test"},
+	})
 	if err != nil {
 		t.Fatalf("exec: %v", err)
 	}
@@ -156,7 +159,11 @@ func TestIntegrationRuntimeSnapshotFlow(t *testing.T) {
 		t.Fatalf("unexpected exec code: %d", execResult.ExitCode)
 	}
 
-	codeResult, err := handle.RunCode(ctx, CodeInput{Language: CodeLanguageNode, Code: `console.log("ok")`})
+	codeResult, err := handle.RunCode(ctx, CodeInput{
+		Language: CodeLanguageNode,
+		Code:     `console.log(process.env.SDK_CODE_ENV)`,
+		Env:      map[string]string{"SDK_CODE_ENV": "ok"},
+	})
 	if err != nil {
 		t.Fatalf("run code: %v", err)
 	}
