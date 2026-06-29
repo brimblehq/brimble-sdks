@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, cast
 
-import requests
+from ..streaming import ByteStream, ExecStream
 
 from ..constants import DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS, DEFAULT_SANDBOX_READY_TIMEOUT_MS
 from ..enums import SandboxStatus
@@ -129,10 +129,18 @@ class SandboxHandle:
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
         wait_until_ready: WaitPreference | None = None,
-    ) -> ExecResult | requests.Response:
+        on_stdout: Callable[[str], None] | None = None,
+        on_stderr: Callable[[str], None] | None = None,
+    ) -> ExecResult | ExecStream:
         """Run a shell command in this sandbox; optionally auto-wait for readiness."""
         self._ensure_ready(wait_until_ready)
-        return self._scope.exec(input, timeout_ms=timeout_ms, retry=retry)
+        return self._scope.exec(
+            input,
+            timeout_ms=timeout_ms,
+            retry=retry,
+            on_stdout=on_stdout,
+            on_stderr=on_stderr,
+        )
 
     def run_code(
         self,
@@ -141,10 +149,18 @@ class SandboxHandle:
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
         wait_until_ready: WaitPreference | None = None,
-    ) -> ExecResult | requests.Response:
+        on_stdout: Callable[[str], None] | None = None,
+        on_stderr: Callable[[str], None] | None = None,
+    ) -> ExecResult | ExecStream:
         """Run a code snippet in this sandbox; optionally auto-wait for readiness."""
         self._ensure_ready(wait_until_ready)
-        return self._scope.run_code(input, timeout_ms=timeout_ms, retry=retry)
+        return self._scope.run_code(
+            input,
+            timeout_ms=timeout_ms,
+            retry=retry,
+            on_stdout=on_stdout,
+            on_stderr=on_stderr,
+        )
 
     def exec_stream(
         self,
@@ -153,8 +169,8 @@ class SandboxHandle:
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
         wait_until_ready: WaitPreference | None = None,
-    ) -> requests.Response:
-        """Run a shell command and stream SSE output frames."""
+    ) -> ExecStream:
+        """Run a shell command and stream parsed stdout/stderr output."""
         self._ensure_ready(wait_until_ready)
         return self._scope.exec_stream(input, timeout_ms=timeout_ms, retry=retry)
 
@@ -165,8 +181,8 @@ class SandboxHandle:
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
         wait_until_ready: WaitPreference | None = None,
-    ) -> requests.Response:
-        """Run a code snippet and stream SSE output frames."""
+    ) -> ExecStream:
+        """Run a code snippet and stream parsed stdout/stderr output."""
         self._ensure_ready(wait_until_ready)
         return self._scope.run_code_stream(input, timeout_ms=timeout_ms, retry=retry)
 
@@ -190,7 +206,7 @@ class SandboxHandle:
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
         wait_until_ready: WaitPreference | None = None,
-    ) -> requests.Response:
+    ) -> ByteStream:
         """Download file bytes from this sandbox; optionally auto-wait for readiness."""
         self._ensure_ready(wait_until_ready)
         return self._scope.get_file(path, timeout_ms=timeout_ms, retry=retry)

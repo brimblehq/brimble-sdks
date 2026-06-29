@@ -74,6 +74,7 @@ class CreateSandboxInput(TypedDict, total=False):
     persistent: bool
     persistentDiskGB: int
     volumeId: str
+    mountPath: str
     fromSnapshot: str
     snapshotMode: SnapshotMode
     snapshotFrequency: str
@@ -93,6 +94,7 @@ class CreateSandboxRequest(TypedDict, total=False):
     persistent: bool
     persistentDiskGB: int
     volumeId: str
+    mountPath: str
     fromSnapshot: str
     snapshotMode: SnapshotMode
     snapshotFrequency: str
@@ -162,6 +164,7 @@ class CreateSandboxWithVolumeSandboxInput(TypedDict, total=False):
     destroyTimeout: DestroyTimeout
     oneShot: bool
     blockOutbound: bool
+    mountPath: str
     fromSnapshot: str
     snapshotMode: SnapshotMode
     snapshotFrequency: str
@@ -179,11 +182,41 @@ class CreateSandboxWithVolumeInput(TypedDict):
     volume: CreateSandboxWithVolumeVolumeInput
 
 
+class ExecStdoutFrame(TypedDict):
+    type: Literal["stdout"]
+    data: str
+
+
+class ExecStderrFrame(TypedDict):
+    type: Literal["stderr"]
+    data: str
+
+
+class ExecDoneFrame(TypedDict):
+    type: Literal["done"]
+    exit_code: int
+    duration_ms: int
+
+
+class ExecErrorFrame(TypedDict):
+    type: Literal["error"]
+    message: str
+
+
+ExecStreamFrame = Union[ExecStdoutFrame, ExecStderrFrame, ExecDoneFrame, ExecErrorFrame]
+
+
+class ExecLog(TypedDict):
+    stream: Literal["stdout", "stderr"]
+    data: str
+
+
 class ExecInput(TypedDict, total=False):
     cmd: str
     timeout_seconds: int
     cwd: str
     stream: bool
+    env: dict[str, str]
 
 
 class CodeInput(TypedDict, total=False):
@@ -192,6 +225,7 @@ class CodeInput(TypedDict, total=False):
     timeout_seconds: int
     cwd: str
     stream: bool
+    env: dict[str, str]
 
 
 class ExecResult(TypedDict):

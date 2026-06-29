@@ -96,11 +96,17 @@ def test_runtime_snapshot_flow() -> None:
     try:
         sandbox.wait_until_ready(timeout_ms=180_000, poll_interval_ms=2_000)
 
-        result = sandbox.exec({"cmd": "echo py-sdk-test"})
+        result = sandbox.exec({"cmd": 'echo "$SDK_ENV_TEST"', "env": {"SDK_ENV_TEST": "py-sdk-test"}})
         assert result["exit_code"] == 0
         assert "py-sdk-test" in result["stdout"]
 
-        code = sandbox.run_code({"language": CodeLanguage.NODE, "code": 'console.log("x")'})
+        code = sandbox.run_code(
+            {
+                "language": CodeLanguage.NODE,
+                "code": 'console.log(process.env.SDK_CODE_ENV)',
+                "env": {"SDK_CODE_ENV": "x"},
+            }
+        )
         assert code["exit_code"] == 0
 
         sandbox.put_file("tmp/py-sdk-test.txt", b"hello")

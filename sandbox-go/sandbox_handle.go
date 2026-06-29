@@ -156,15 +156,23 @@ func (h *SandboxHandle) ensureReady(ctx context.Context, runtimeOptions *Runtime
 
 // Exec runs a shell command once sandbox is ready.
 func (h *SandboxHandle) Exec(ctx context.Context, input ExecInput, runtimeOptions ...RuntimeOptions) (*ExecResult, error) {
+	return h.ExecWithHooks(ctx, input, nil, runtimeOptions...)
+}
+
+// ExecWithHooks runs a shell command and optionally streams live stdout/stderr.
+func (h *SandboxHandle) ExecWithHooks(ctx context.Context, input ExecInput, hooks *ExecHooks, runtimeOptions ...RuntimeOptions) (*ExecResult, error) {
 	options := firstRuntimeOptions(runtimeOptions...)
 	if err := h.ensureReady(ctx, options); err != nil {
 		return nil, err
 	}
-	return h.scope().Exec(ctx, input)
+	if hooks == nil {
+		return h.scope().Exec(ctx, input)
+	}
+	return h.scope().Exec(ctx, input, hooks)
 }
 
-// ExecStream runs a shell command and streams SSE frames once sandbox is ready.
-func (h *SandboxHandle) ExecStream(ctx context.Context, input ExecInput, runtimeOptions ...RuntimeOptions) (io.ReadCloser, error) {
+// ExecStream runs a shell command and streams parsed stdout/stderr once sandbox is ready.
+func (h *SandboxHandle) ExecStream(ctx context.Context, input ExecInput, runtimeOptions ...RuntimeOptions) (*ExecStream, error) {
 	options := firstRuntimeOptions(runtimeOptions...)
 	if err := h.ensureReady(ctx, options); err != nil {
 		return nil, err
@@ -174,15 +182,23 @@ func (h *SandboxHandle) ExecStream(ctx context.Context, input ExecInput, runtime
 
 // RunCode runs a code snippet once sandbox is ready.
 func (h *SandboxHandle) RunCode(ctx context.Context, input CodeInput, runtimeOptions ...RuntimeOptions) (*ExecResult, error) {
+	return h.RunCodeWithHooks(ctx, input, nil, runtimeOptions...)
+}
+
+// RunCodeWithHooks runs a code snippet and optionally streams live stdout/stderr.
+func (h *SandboxHandle) RunCodeWithHooks(ctx context.Context, input CodeInput, hooks *ExecHooks, runtimeOptions ...RuntimeOptions) (*ExecResult, error) {
 	options := firstRuntimeOptions(runtimeOptions...)
 	if err := h.ensureReady(ctx, options); err != nil {
 		return nil, err
 	}
-	return h.scope().RunCode(ctx, input)
+	if hooks == nil {
+		return h.scope().RunCode(ctx, input)
+	}
+	return h.scope().RunCode(ctx, input, hooks)
 }
 
-// RunCodeStream runs a code snippet and streams SSE frames once sandbox is ready.
-func (h *SandboxHandle) RunCodeStream(ctx context.Context, input CodeInput, runtimeOptions ...RuntimeOptions) (io.ReadCloser, error) {
+// RunCodeStream runs a code snippet and streams parsed stdout/stderr once sandbox is ready.
+func (h *SandboxHandle) RunCodeStream(ctx context.Context, input CodeInput, runtimeOptions ...RuntimeOptions) (*ExecStream, error) {
 	options := firstRuntimeOptions(runtimeOptions...)
 	if err := h.ensureReady(ctx, options); err != nil {
 		return nil, err

@@ -30,6 +30,7 @@ from .resources import (
     StatsResource,
     VolumesResource,
 )
+from .streaming import ByteStream, ExecStream, consume_exec_stream, parse_sse_frames
 from .transport import RequestOptions, RetryOptions
 
 __all__ = [
@@ -71,4 +72,8 @@ __all__ = [
     "SnapshotsResource",
     "StatsResource",
     "VolumesResource",
+    "ByteStream",
+    "ExecStream",
+    "consume_exec_stream",
+    "parse_sse_frames",
 ]

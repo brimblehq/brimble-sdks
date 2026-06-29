@@ -50,13 +50,28 @@ if err != nil {
 	panic(err)
 }
 
-fmt.Println(result.Stdout)
+	fmt.Println(result.Stdout)
 
-stream, err := handle.ExecStream(ctx, sandbox.ExecInput{Cmd: "for i in 1 2 3; do echo $i; done"})
-if err != nil {
-	panic(err)
-}
-defer stream.Close()
+	output, err := handle.ExecStream(ctx, sandbox.ExecInput{Cmd: "for i in 1 2 3; do echo $i; done"})
+	if err != nil {
+		panic(err)
+	}
+	defer output.Close()
+
+	if err := output.IterateLogs(ctx, func(log sandbox.ExecLog) error {
+		if log.Stream == sandbox.LogStreamStdout {
+			fmt.Print(log.Data)
+		}
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+
+	streamed, err := output.Result(ctx)
+	if err != nil {
+		panic(err)
+	}
+	_ = streamed
 
 _, err = handle.PutFiles(ctx, []sandbox.BatchFileUploadItem{
 	{Path: "/tmp/hello.txt", Content: []byte("hello from batch")},

@@ -32,9 +32,10 @@ const sandbox = await client.sandboxes.createReady({
   template: 'node-22',
   persistent: true,
   persistentDiskGB: 20,
+  mountPath: '/workspace',
 });
 
-await sandbox.exec({ cmd: 'node -v' });
+await sandbox.exec({ cmd: 'node -v', env: { NODE_ENV: 'production' } });
 
 await sandbox.putFile('tmp/notes.txt', Buffer.from('hello sandbox'));
 await sandbox.putFiles([
@@ -46,6 +47,7 @@ const stream = await sandbox.getFile('tmp/notes.txt');
 await sandbox.runCode({
   language: CodeLanguage.Node,
   code: 'console.log(1 + 1)',
+  env: { FEATURE_FLAG: 'on' },
 });
 
 // Handle-first lifecycle on existing sandboxes.
@@ -67,15 +69,31 @@ const loaded = await client.sandboxes.getReady(created.id);
 
 // 3) Create a volume + attach in one call
 const withVolume = await client.sandboxes.withVolume({
-  sandbox: { template: 'node-22' },
+  sandbox: { template: 'node-22', mountPath: '/var/www/html' },
   volume: { name: 'workspace-disk', sizeGB: 20 },
 });
 
 // 4) Auto-wait at runtime call sites
 await withVolume.exec({ cmd: 'npm -v' }, { waitUntilReady: true });
 
-// Streaming SSE output (stream: true returns ReadableStream<Uint8Array>)
-const sse = await withVolume.exec({ cmd: 'for i in 1 2 3; do echo $i; done', stream: true });
+// Streaming command output (Vercel/Railway-style async iteration)
+const output = await withVolume.exec({ cmd: 'for i in 1 2 3; do echo $i; done', stream: true });
+for await (const log of output) {
+  if (log.stream === 'stdout') process.stdout.write(log.data);
+}
+const streamedResult = await output.result();
+
+// Or stream with callbacks and still get the final ExecResult
+const buffered = await withVolume.exec({
+  cmd: 'npm install',
+  onStdout: (chunk) => process.stdout.write(chunk),
+});
+
+// File downloads
+const file = await withVolume.getFile('tmp/notes.txt');
+for await (const chunk of file) {
+  process.stdout.write(chunk);
+}
 
 // 5) List templates/regions
 const templates = await client.sandboxes.listTemplates();
@@ -126,7 +144,7 @@ If `region` is omitted, the SDK resolves the first available sandbox region auto
 - `sandbox` handle (returned from `create/get/list`)
   - `waitUntilReady`, `refresh`, `destroy`, `pause`, `resume`, `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`, `snapshots.create`, `snapshots.list`
 - `client.sandboxes.use(id)`
-  - `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`
+  - `destroy`, `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`
 - `client.snapshots`
   - `listAll`, `iterateAll`, `delete`
 - `client.volumes`

@@ -3,6 +3,7 @@ import { FilesResource } from './files';
 import { SnapshotScopeResource } from './snapshots';
 import { StatsResource } from './stats';
 import { HttpTransport } from '../transport/http';
+import type { ExecStream } from '../streaming';
 import type {
   BatchFileUploadInput,
   BatchFileUploadResponse,
@@ -20,6 +21,8 @@ import type {
 import type { RequestOptions } from '../transport/http';
 
 export class ScopedSandboxResource {
+  private readonly transport: HttpTransport;
+  private readonly sandboxId: string;
   /** Lower-level exec/code runner resource. */
   public readonly execResource: ExecResource;
   /** File upload/download resource. */
@@ -31,23 +34,34 @@ export class ScopedSandboxResource {
 
   /** @internal Create a sandbox-scoped resource wrapper. */
   public constructor(transport: HttpTransport, sandboxId: string) {
+    this.transport = transport;
+    this.sandboxId = sandboxId;
     this.execResource = new ExecResource(transport, sandboxId);
     this.files = new FilesResource(transport, sandboxId);
     this.snapshots = new SnapshotScopeResource(transport, sandboxId);
     this.statsResource = new StatsResource(transport, sandboxId);
   }
 
+  /** Destroy this sandbox. */
+  public async destroy(options?: RequestOptions): Promise<void> {
+    await this.transport.requestJson({
+      endpoint: `/sandboxes/${this.sandboxId}`,
+      method: 'DELETE',
+      ...options,
+    });
+  }
+
   /** Run a shell command in this sandbox. */
-  public exec(input: ExecInput & { stream: true }, options?: RequestOptions): Promise<ReadableStream<Uint8Array>>;
+  public exec(input: ExecInput & { stream: true }, options?: RequestOptions): Promise<ExecStream>;
   public exec(input: ExecInput, options?: RequestOptions): Promise<ExecResult>;
-  public exec(input: ExecInput, options?: RequestOptions): Promise<ExecResult | ReadableStream<Uint8Array>> {
+  public exec(input: ExecInput, options?: RequestOptions): Promise<ExecResult | ExecStream> {
     return this.execResource.exec(input, options);
   }
 
   /** Run a code snippet in this sandbox. */
-  public runCode(input: CodeInput & { stream: true }, options?: RequestOptions): Promise<ReadableStream<Uint8Array>>;
+  public runCode(input: CodeInput & { stream: true }, options?: RequestOptions): Promise<ExecStream>;
   public runCode(input: CodeInput, options?: RequestOptions): Promise<ExecResult>;
-  public runCode(input: CodeInput, options?: RequestOptions): Promise<ExecResult | ReadableStream<Uint8Array>> {
+  public runCode(input: CodeInput, options?: RequestOptions): Promise<ExecResult | ExecStream> {
     return this.execResource.runCode(input, options);
   }
 
@@ -56,8 +70,8 @@ export class ScopedSandboxResource {
     return this.files.put(path, body, options);
   }
 
-  /** Download file bytes from this sandbox as a stream. */
-  public getFile(path: string, options?: RequestOptions): Promise<ReadableStream<Uint8Array>> {
+  /** Download file bytes from this sandbox as an async iterable byte stream. */
+  public getFile(path: string, options?: RequestOptions): Promise<AsyncIterable<Uint8Array>> {
     return this.files.get(path, options);
   }
 

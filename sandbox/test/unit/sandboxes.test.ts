@@ -67,3 +67,23 @@ describe('SandboxesResource templates helpers', () => {
   });
 });
 
+describe('ScopedSandboxResource lifecycle helpers', () => {
+  test('destroy deletes sandbox by id', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 })) as typeof fetch;
+
+    const client = new Sandbox({
+      apiKey: 'test-key',
+      fetchImpl,
+    });
+
+    const scope = client.sandboxes.use('sandbox-123');
+    await scope.destroy();
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchImpl.mock.calls[0] ?? [];
+    expect(requestInit?.method).toBe('DELETE');
+
+    const [url] = fetchImpl.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/sandboxes/sandbox-123');
+  });
+});

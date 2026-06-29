@@ -26,6 +26,7 @@ import type {
 } from '../types';
 import { ScopedSandboxResource } from './scoped-sandbox';
 import type { SandboxesResource } from './sandboxes';
+import type { ExecStream } from '../streaming';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -128,9 +129,9 @@ export class SandboxHandle {
    * Run a shell command in this sandbox.
    * By default this throws when not ready; set `waitUntilReady` to auto-wait.
    */
-  public exec(input: ExecInput & { stream: true }, options?: SandboxRuntimeOptions): Promise<ReadableStream<Uint8Array>>;
+  public exec(input: ExecInput & { stream: true }, options?: SandboxRuntimeOptions): Promise<ExecStream>;
   public exec(input: ExecInput, options?: SandboxRuntimeOptions): Promise<ExecResult>;
-  public async exec(input: ExecInput, options: SandboxRuntimeOptions = {}): Promise<ExecResult | ReadableStream<Uint8Array>> {
+  public async exec(input: ExecInput, options: SandboxRuntimeOptions = {}): Promise<ExecResult | ExecStream> {
     await this.ensureReady(options.waitUntilReady);
     return this.scope.exec(input, options);
   }
@@ -139,9 +140,9 @@ export class SandboxHandle {
    * Run a code snippet in this sandbox.
    * By default this throws when not ready; set `waitUntilReady` to auto-wait.
    */
-  public runCode(input: CodeInput & { stream: true }, options?: SandboxRuntimeOptions): Promise<ReadableStream<Uint8Array>>;
+  public runCode(input: CodeInput & { stream: true }, options?: SandboxRuntimeOptions): Promise<ExecStream>;
   public runCode(input: CodeInput, options?: SandboxRuntimeOptions): Promise<ExecResult>;
-  public async runCode(input: CodeInput, options: SandboxRuntimeOptions = {}): Promise<ExecResult | ReadableStream<Uint8Array>> {
+  public async runCode(input: CodeInput, options: SandboxRuntimeOptions = {}): Promise<ExecResult | ExecStream> {
     await this.ensureReady(options.waitUntilReady);
     return this.scope.runCode(input, options);
   }
@@ -159,7 +160,7 @@ export class SandboxHandle {
    * Download a file from this sandbox.
    * By default this throws when not ready; set `waitUntilReady` to auto-wait.
    */
-  public async getFile(path: string, options: SandboxRuntimeOptions = {}): Promise<ReadableStream<Uint8Array>> {
+  public async getFile(path: string, options: SandboxRuntimeOptions = {}): Promise<AsyncIterable<Uint8Array>> {
     await this.ensureReady(options.waitUntilReady);
     return this.scope.getFile(path, options);
   }

@@ -17,6 +17,14 @@ export { AuthError, NotFoundError, RateLimitError, SandboxApiError, ValidationEr
 export type { SandboxApiErrorArgs } from './errors';
 
 export {
+  asByteStream,
+  consumeExecStream,
+  ExecStream,
+  parseSseFrames,
+} from './streaming';
+export type { ExecLog, ExecStreamOptions } from './streaming';
+
+export {
   CodeLanguage,
   DestroyReason,
   DestroyTimeout,
@@ -47,6 +55,7 @@ export type {
   CreateVolumeInput,
   ExecInput,
   ExecResult,
+  ExecStreamCallbacks,
   ExecStreamFrame,
   FileUploadBody,
   Paginated,

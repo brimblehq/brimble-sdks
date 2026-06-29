@@ -1,11 +1,17 @@
 import { CodeLanguage } from '../enums';
 
+export type ExecStreamCallbacks = {
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
+};
+
 export type ExecInput = {
   cmd: string;
   timeout_seconds?: number;
   cwd?: string;
   stream?: boolean;
-};
+  env?: Record<string, string>;
+} & ExecStreamCallbacks;
 
 export type CodeInput = {
   language: CodeLanguage;
@@ -13,7 +19,8 @@ export type CodeInput = {
   timeout_seconds?: number;
   cwd?: string;
   stream?: boolean;
-};
+  env?: Record<string, string>;
+} & ExecStreamCallbacks;
 
 export type ExecResult = {
   stdout: string;

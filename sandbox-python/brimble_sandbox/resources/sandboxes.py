@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Iterator, cast
 
 from ..constants import DEFAULT_PAGE, DEFAULT_PAGE_LIMIT
@@ -23,6 +24,8 @@ from .sandbox_handle import SandboxHandle
 from .scoped_sandbox import ScopedSandboxResource
 from .volumes import VolumesResource
 
+MOUNT_PATH_PATTERN = re.compile(r"^/[A-Za-z0-9._/-]*$")
+
 
 class SandboxesResource:
     """Manage sandbox lifecycle and metadata."""
@@ -40,8 +43,10 @@ class SandboxesResource:
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
         """Create a sandbox. Region is optional; omitted means auto-select first available region."""
-        resolved_region = self._resolve_region_id(input.get("region"), timeout_ms=timeout_ms)
         body: CreateSandboxRequest = dict(input)
+        self._apply_mount_path_default(body)
+        self._validate_mount_path(body)
+        resolved_region = self._resolve_create_region_id(body, timeout_ms=timeout_ms, retry=retry)
         body["region"] = resolved_region
 
         result = cast(
@@ -355,6 +360,7 @@ class SandboxesResource:
                 "template": "node-22",
                 "persistent": True,
                 "persistentDiskGB": 20,
+                "mountPath": "/workspace",
             },
             timeout_ms=timeout_ms,
             retry=retry,
@@ -380,6 +386,7 @@ class SandboxesResource:
                 "template": "python-3.12",
                 "persistent": True,
                 "persistentDiskGB": 20,
+                "mountPath": "/workspace",
             },
             timeout_ms=timeout_ms,
             retry=retry,
@@ -404,6 +411,60 @@ class SandboxesResource:
             raise RuntimeError("No sandbox regions available for this account.")
 
         return str(region_id)
+
+    def _resolve_create_region_id(
+        self,
+        input: CreateSandboxRequest,
+        *,
+        timeout_ms: int | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> str:
+        region = input.get("region")
+        if region and region != "auto":
+            return str(region)
+
+        volume_id = input.get("volumeId")
+        if isinstance(volume_id, str) and volume_id != "":
+            volume = self._volumes.get(volume_id, timeout_ms=timeout_ms, retry=retry)
+            region_payload = volume.get("region")
+            if isinstance(region_payload, dict):
+                region_id = region_payload.get("id")
+                if isinstance(region_id, str) and region_id != "":
+                    return region_id
+
+            raise RuntimeError("Unable to infer region from attached volume. Pass `region` explicitly.")
+
+        return self._resolve_region_id(cast(SandboxRegionInput | None, region), timeout_ms=timeout_ms)
+
+    def _validate_mount_path(self, input: CreateSandboxRequest) -> None:
+        mount_path = input.get("mountPath")
+        has_persistent = input.get("persistent") is True
+        has_volume = isinstance(input.get("volumeId"), str) and len(str(input.get("volumeId"))) > 0
+        has_storage = has_persistent or has_volume
+        has_mount_path = isinstance(mount_path, str) and mount_path != ""
+
+        if has_storage and not has_mount_path:
+            raise ValueError("mountPath is required when using persistent storage (`persistent`/`persistentDiskGB` or `volumeId`).")
+
+        if not has_mount_path:
+            return
+
+        mount_path_value = str(mount_path)
+        if not MOUNT_PATH_PATTERN.fullmatch(mount_path_value) or mount_path_value == "/":
+            raise ValueError('mountPath must match ^/[A-Za-z0-9._/-]*$ and cannot be "/".')
+
+        if not has_persistent and not has_volume:
+            raise ValueError("mountPath requires either `persistent: true` or `volumeId`.")
+
+    def _apply_mount_path_default(self, input: CreateSandboxRequest) -> None:
+        has_persistent = input.get("persistent") is True
+        has_volume = isinstance(input.get("volumeId"), str) and len(str(input.get("volumeId"))) > 0
+        has_storage = has_persistent or has_volume
+        mount_path = input.get("mountPath")
+        has_mount_path = isinstance(mount_path, str) and mount_path != ""
+
+        if has_storage and not has_mount_path:
+            input["mountPath"] = "/workspace"
 
 
 def _options(

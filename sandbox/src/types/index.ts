@@ -1,4 +1,4 @@
-export type { CodeInput, ExecInput, ExecResult, ExecStreamFrame } from './exec';
+export type { CodeInput, ExecInput, ExecResult, ExecStreamCallbacks, ExecStreamFrame } from './exec';
 export type { BatchFileUploadBody, BatchFileUploadInput, BatchFileUploadResponse, BatchFileUploadResult, FileUploadBody } from './files';
 export type { Paginated, Pagination, TeamScopedPagination } from './pagination';
 export type { RegionSummary, SandboxRegion, SandboxRegionsResult } from './region';

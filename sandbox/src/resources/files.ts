@@ -1,6 +1,7 @@
 import type { BatchFileUploadInput, BatchFileUploadResponse, FileUploadBody } from '../types';
 import type { RequestOptions } from '../transport/http';
 import { HttpTransport } from '../transport/http';
+import { asByteStream } from '../streaming';
 import { encodeFilePath } from './path';
 
 export class FilesResource {
@@ -35,13 +36,15 @@ export class FilesResource {
     });
   }
 
-  /** Download a file from the sandbox as a stream. */
-  public get(path: string, options?: RequestOptions): Promise<ReadableStream<Uint8Array>> {
-    return this.transport.requestStream({
+  /** Download a file from the sandbox as an async iterable byte stream. */
+  public async get(path: string, options?: RequestOptions): Promise<AsyncIterable<Uint8Array>> {
+    const stream = await this.transport.requestStream({
       endpoint: `/sandboxes/${this.sandboxId}/files/${encodeFilePath(path)}`,
       method: 'GET',
       ...options,
     });
+
+    return asByteStream(stream);
   }
 
   /**

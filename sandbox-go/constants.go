@@ -15,7 +15,7 @@ const (
 const (
 	DefaultTimeout                  = 30 * time.Second
 	DefaultSandboxReadyTimeout      = 60 * time.Second
-	DefaultSandboxReadyPollInterval = 2 * time.Second
+	DefaultSandboxReadyPollInterval = 500 * time.Millisecond
 )
 
 const (

@@ -20,10 +20,11 @@ sandbox = client.sandboxes.create_ready(
         "template": "node-22",
         "persistent": True,
         "persistentDiskGB": 20,
+        "mountPath": "/workspace",
     }
 )
 
-result = sandbox.exec({"cmd": "node -v"})
+result = sandbox.exec({"cmd": "node -v", "env": {"NODE_ENV": "production"}})
 print(result["stdout"])
 
 sandbox.put_files(
@@ -49,7 +50,7 @@ loaded = client.sandboxes.get_ready(created.id)
 # Create volume + attach at sandbox creation time
 with_volume = client.sandboxes.with_volume(
     {
-        "sandbox": {"template": "node-22"},
+        "sandbox": {"template": "node-22", "mountPath": "/var/www/html"},
         "volume": {"name": "workspace-disk", "sizeGB": 20},
     }
 )
@@ -57,8 +58,24 @@ with_volume = client.sandboxes.with_volume(
 # Auto-wait on runtime calls
 with_volume.exec({"cmd": "npm -v"}, wait_until_ready=True)
 
-# Streaming SSE output
-stream = with_volume.exec_stream({"cmd": "for i in 1 2 3; do echo $i; done"})
+# Streaming command output
+output = with_volume.exec_stream({"cmd": "for i in 1 2 3; do echo $i; done"})
+for log in output:
+    if log["stream"] == "stdout":
+        print(log["data"], end="")
+result = output.result()
+
+# Or stream with callbacks and still get the final result
+buffered = with_volume.exec(
+    {"cmd": "npm install"},
+    on_stdout=lambda chunk: print(chunk, end=""),
+)
+
+# File downloads
+file_stream = with_volume.get_file("tmp/notes.txt")
+for chunk in file_stream:
+    print(chunk.decode("utf-8"), end="")
+file_stream.close()
 
 # Templates + regions
 templates = client.sandboxes.list_templates()

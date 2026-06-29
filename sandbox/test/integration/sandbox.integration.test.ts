@@ -4,7 +4,7 @@ import { Sandbox } from '../../src/client';
 import { MIN_VOLUME_SIZE_GB } from '../../src/constants';
 import { NotFoundError } from '../../src/errors';
 import { CodeLanguage, VolumeType } from '../../src/enums';
-import type { CreateSandboxRequest, ExecStreamFrame, SandboxHandle, SandboxTemplate } from '../../src/types';
+import type { CreateSandboxRequest, SandboxHandle, SandboxTemplate } from '../../src/types';
 
 const apiKey = process.env.BRIMBLE_SANDBOX_KEY;
 const describeLive = apiKey ? describe : describe.skip;
@@ -15,49 +15,15 @@ async function sleep(ms: number): Promise<void> {
   });
 }
 
-async function readStreamToText(stream: ReadableStream<Uint8Array>): Promise<string> {
-  const reader = stream.getReader();
+async function readByteStreamToText(stream: AsyncIterable<Uint8Array>): Promise<string> {
   const decoder = new TextDecoder('utf-8');
   let text = '';
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    if (value) {
-      text += decoder.decode(value, { stream: true });
-    }
+  for await (const chunk of stream) {
+    text += decoder.decode(chunk, { stream: true });
   }
 
-  text += decoder.decode();
-  return text;
-}
-
-function parseSseFrames(payload: string): ExecStreamFrame[] {
-  const frames: ExecStreamFrame[] = [];
-  const blocks = payload.split(/\n\n/);
-
-  for (const block of blocks) {
-    const line = block
-      .split('\n')
-      .map((value) => value.trim())
-      .find((value) => value.startsWith('data:'));
-
-    if (!line) {
-      continue;
-    }
-
-    const json = line.slice('data:'.length).trim();
-    if (!json) {
-      continue;
-    }
-
-    frames.push(JSON.parse(json) as ExecStreamFrame);
-  }
-
-  return frames;
+  return text + decoder.decode();
 }
 
 function chooseTemplate(templates: SandboxTemplate[]): string | undefined {
@@ -202,7 +168,10 @@ describeLive('Sandbox SDK live integration', () => {
       }
       expect(sandboxSeen).toBe(true);
 
-      const execResult = await sandbox.exec({ cmd: 'echo brimble-sdk-test' });
+      const execResult = await sandbox.exec({
+        cmd: 'echo "$SDK_ENV_TEST"',
+        env: { SDK_ENV_TEST: 'brimble-sdk-test' },
+      });
       expect(execResult.exit_code).toBe(0);
       expect(execResult.stdout).toContain('brimble-sdk-test');
 
@@ -212,24 +181,33 @@ describeLive('Sandbox SDK live integration', () => {
 
       const codeResult = await sandbox.runCode({
         language: CodeLanguage.Node,
-        code: 'console.log("run-code-ok")',
+        code: 'console.log(process.env.SDK_CODE_ENV)',
+        env: { SDK_CODE_ENV: 'run-code-ok' },
       });
       expect(codeResult.exit_code).toBe(0);
       expect(codeResult.stdout).toContain('run-code-ok');
 
-      const sseStream = await sandbox.exec({
+      const output = await sandbox.exec({
         cmd: 'for i in 1 2 3; do echo $i; done',
         stream: true,
       });
-      const sseText = await readStreamToText(sseStream);
-      const sseFrames = parseSseFrames(sseText);
-      const doneFrame = sseFrames.find((frame) => frame.type === 'done');
-      expect(doneFrame).toBeTruthy();
-      expect(doneFrame && doneFrame.type === 'done' ? doneFrame.exit_code : 1).toBe(0);
+
+      const stdoutChunks: string[] = [];
+      for await (const frame of output.frames()) {
+        if (frame.type === 'stdout') {
+          stdoutChunks.push(frame.data);
+        }
+
+        if (frame.type === 'done') {
+          expect(frame.exit_code).toBe(0);
+        }
+      }
+
+      expect(stdoutChunks.join('')).toContain('1');
 
       await sandbox.putFile('tmp/sdk-integration.txt', Buffer.from('file-roundtrip-ok', 'utf-8'));
       const fileStream = await sandbox.getFile('tmp/sdk-integration.txt');
-      const fileContents = await readStreamToText(fileStream);
+      const fileContents = await readByteStreamToText(fileStream);
       expect(fileContents).toContain('file-roundtrip-ok');
 
       const batchUpload = await sandbox.putFiles([
@@ -240,7 +218,7 @@ describeLive('Sandbox SDK live integration', () => {
       expect(batchUpload.failed).toBe(0);
 
       const batchFileStream = await sandbox.getFile('tmp/batch-a.txt');
-      const batchFileContents = await readStreamToText(batchFileStream);
+      const batchFileContents = await readByteStreamToText(batchFileStream);
       expect(batchFileContents).toContain('batch-a');
 
       const stats = await sandbox.stats({ hoursAgo: 1 });

@@ -3,7 +3,6 @@ package sandbox
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 )
 
@@ -14,9 +13,18 @@ type ExecResource struct {
 }
 
 // Exec runs a shell command.
-func (r *ExecResource) Exec(ctx context.Context, input ExecInput) (*ExecResult, error) {
+func (r *ExecResource) Exec(ctx context.Context, input ExecInput, hooks ...*ExecHooks) (*ExecResult, error) {
 	if input.Stream != nil && *input.Stream {
-		return nil, fmt.Errorf("stream=true returns an SSE stream. use ExecStream")
+		return nil, fmt.Errorf("stream=true returns a parsed stream. use ExecStream")
+	}
+
+	h := firstExecHooks(hooks...)
+	if wantsLiveOutput(h) {
+		stream, err := r.ExecStream(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+		return consumeExecStream(ctx, stream, h)
 	}
 
 	var out ExecResult
@@ -27,17 +35,30 @@ func (r *ExecResource) Exec(ctx context.Context, input ExecInput) (*ExecResult, 
 	return &out, nil
 }
 
-// ExecStream runs a shell command and returns an SSE stream (`text/event-stream`).
-func (r *ExecResource) ExecStream(ctx context.Context, input ExecInput) (io.ReadCloser, error) {
+// ExecStream runs a shell command and returns parsed live output.
+func (r *ExecResource) ExecStream(ctx context.Context, input ExecInput) (*ExecStream, error) {
 	stream := true
 	input.Stream = &stream
-	return r.client.doSSEStream(ctx, http.MethodPost, "/sandboxes/"+r.sandboxID+"/exec", input)
+	body, err := r.client.doSSEStream(ctx, http.MethodPost, "/sandboxes/"+r.sandboxID+"/exec", input)
+	if err != nil {
+		return nil, err
+	}
+	return newExecStream(body), nil
 }
 
 // RunCode runs a code snippet.
-func (r *ExecResource) RunCode(ctx context.Context, input CodeInput) (*ExecResult, error) {
+func (r *ExecResource) RunCode(ctx context.Context, input CodeInput, hooks ...*ExecHooks) (*ExecResult, error) {
 	if input.Stream != nil && *input.Stream {
-		return nil, fmt.Errorf("stream=true returns an SSE stream. use RunCodeStream")
+		return nil, fmt.Errorf("stream=true returns a parsed stream. use RunCodeStream")
+	}
+
+	h := firstExecHooks(hooks...)
+	if wantsLiveOutput(h) {
+		stream, err := r.RunCodeStream(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+		return consumeExecStream(ctx, stream, h)
 	}
 
 	var out ExecResult
@@ -48,9 +69,13 @@ func (r *ExecResource) RunCode(ctx context.Context, input CodeInput) (*ExecResul
 	return &out, nil
 }
 
-// RunCodeStream runs a code snippet and returns an SSE stream (`text/event-stream`).
-func (r *ExecResource) RunCodeStream(ctx context.Context, input CodeInput) (io.ReadCloser, error) {
+// RunCodeStream runs a code snippet and returns parsed live output.
+func (r *ExecResource) RunCodeStream(ctx context.Context, input CodeInput) (*ExecStream, error) {
 	stream := true
 	input.Stream = &stream
-	return r.client.doSSEStream(ctx, http.MethodPost, "/sandboxes/"+r.sandboxID+"/code", input)
+	body, err := r.client.doSSEStream(ctx, http.MethodPost, "/sandboxes/"+r.sandboxID+"/code", input)
+	if err != nil {
+		return nil, err
+	}
+	return newExecStream(body), nil
 }

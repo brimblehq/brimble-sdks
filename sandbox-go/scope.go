@@ -27,22 +27,22 @@ func newSandboxScope(client *Client, sandboxID string) *SandboxScope {
 }
 
 // Exec runs a shell command in this sandbox.
-func (s *SandboxScope) Exec(ctx context.Context, input ExecInput) (*ExecResult, error) {
-	return s.ExecRunner.Exec(ctx, input)
+func (s *SandboxScope) Exec(ctx context.Context, input ExecInput, hooks ...*ExecHooks) (*ExecResult, error) {
+	return s.ExecRunner.Exec(ctx, input, hooks...)
 }
 
-// ExecStream runs a shell command and returns an SSE stream (`text/event-stream`).
-func (s *SandboxScope) ExecStream(ctx context.Context, input ExecInput) (io.ReadCloser, error) {
+// ExecStream runs a shell command and returns parsed live output.
+func (s *SandboxScope) ExecStream(ctx context.Context, input ExecInput) (*ExecStream, error) {
 	return s.ExecRunner.ExecStream(ctx, input)
 }
 
 // RunCode runs a code snippet in this sandbox.
-func (s *SandboxScope) RunCode(ctx context.Context, input CodeInput) (*ExecResult, error) {
-	return s.ExecRunner.RunCode(ctx, input)
+func (s *SandboxScope) RunCode(ctx context.Context, input CodeInput, hooks ...*ExecHooks) (*ExecResult, error) {
+	return s.ExecRunner.RunCode(ctx, input, hooks...)
 }
 
-// RunCodeStream runs a code snippet and returns an SSE stream (`text/event-stream`).
-func (s *SandboxScope) RunCodeStream(ctx context.Context, input CodeInput) (io.ReadCloser, error) {
+// RunCodeStream runs a code snippet and returns parsed live output.
+func (s *SandboxScope) RunCodeStream(ctx context.Context, input CodeInput) (*ExecStream, error) {
 	return s.ExecRunner.RunCodeStream(ctx, input)
 }
 

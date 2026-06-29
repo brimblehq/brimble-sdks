@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import requests
+from collections.abc import Callable
 
-from ..transport import HttpTransport, RetryOptions
+from ..streaming import ByteStream, ExecStream
+from ..transport import HttpTransport, RequestOptions, RetryOptions
 from ..types import (
     BatchFileUploadFileInput,
     CodeInput,
@@ -28,10 +29,26 @@ class ScopedSandboxResource:
     """Convenience wrapper for operations against one sandbox."""
 
     def __init__(self, transport: HttpTransport, sandbox_id: str) -> None:
+        self._transport = transport
+        self._sandbox_id = sandbox_id
         self.exec_resource = ExecResource(transport, sandbox_id)
         self.files = FilesResource(transport, sandbox_id)
         self.snapshots = SnapshotScopeResource(transport, sandbox_id)
         self.stats_resource = StatsResource(transport, sandbox_id)
+
+    def destroy(
+        self,
+        *,
+        timeout_ms: int | None = None,
+        idempotency_key: str | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> None:
+        """Destroy this sandbox."""
+        self._transport.request_json(
+            endpoint=f"/sandboxes/{self._sandbox_id}",
+            method="DELETE",
+            options=RequestOptions(timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry),
+        )
 
     def exec(
         self,
@@ -40,9 +57,18 @@ class ScopedSandboxResource:
         timeout_ms: int | None = None,
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> ExecResult | requests.Response:
+        on_stdout: Callable[[str], None] | None = None,
+        on_stderr: Callable[[str], None] | None = None,
+    ) -> ExecResult | ExecStream:
         """Run a shell command in this sandbox."""
-        return self.exec_resource.exec(input, timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry)
+        return self.exec_resource.exec(
+            input,
+            timeout_ms=timeout_ms,
+            idempotency_key=idempotency_key,
+            retry=retry,
+            on_stdout=on_stdout,
+            on_stderr=on_stderr,
+        )
 
     def run_code(
         self,
@@ -51,9 +77,18 @@ class ScopedSandboxResource:
         timeout_ms: int | None = None,
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> ExecResult | requests.Response:
+        on_stdout: Callable[[str], None] | None = None,
+        on_stderr: Callable[[str], None] | None = None,
+    ) -> ExecResult | ExecStream:
         """Run a code snippet in this sandbox."""
-        return self.exec_resource.run_code(input, timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry)
+        return self.exec_resource.run_code(
+            input,
+            timeout_ms=timeout_ms,
+            idempotency_key=idempotency_key,
+            retry=retry,
+            on_stdout=on_stdout,
+            on_stderr=on_stderr,
+        )
 
     def exec_stream(
         self,
@@ -62,8 +97,8 @@ class ScopedSandboxResource:
         timeout_ms: int | None = None,
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> requests.Response:
-        """Run a shell command and stream SSE output frames."""
+    ) -> ExecStream:
+        """Run a shell command and stream parsed stdout/stderr output."""
         return self.exec_resource.exec_stream(input, timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry)
 
     def run_code_stream(
@@ -73,8 +108,8 @@ class ScopedSandboxResource:
         timeout_ms: int | None = None,
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> requests.Response:
-        """Run a code snippet and stream SSE output frames."""
+    ) -> ExecStream:
+        """Run a code snippet and stream parsed stdout/stderr output."""
         return self.exec_resource.run_code_stream(input, timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry)
 
     def put_file(
@@ -95,8 +130,8 @@ class ScopedSandboxResource:
         *,
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> requests.Response:
-        """Download file bytes from this sandbox as a stream response."""
+    ) -> ByteStream:
+        """Download file bytes from this sandbox as an iterable byte stream."""
         return self.files.get(path, timeout_ms=timeout_ms, retry=retry)
 
     def put_files(

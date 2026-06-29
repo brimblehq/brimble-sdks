@@ -53,12 +53,12 @@ describe('FilesResource putFiles', () => {
     const client = new Sandbox({ apiKey: 'test-key', fetchImpl });
     const scope = client.sandboxes.use('sandbox-1');
 
-    expect(() => scope.putFiles([])).toThrow('putFiles requires at least one file.');
+    await expect(scope.putFiles([])).rejects.toThrow('putFiles requires at least one file.');
 
     const tooMany = Array.from({ length: 101 }, (_, index) => ({
       path: `/tmp/${index}.txt`,
       body: 'x',
     }));
-    expect(() => scope.putFiles(tooMany)).toThrow('putFiles supports at most 100 files per request.');
+    await expect(scope.putFiles(tooMany)).rejects.toThrow('putFiles supports at most 100 files per request.');
   });
 });

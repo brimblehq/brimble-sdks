@@ -29,6 +29,8 @@ export type QuickstartSandboxInput = Omit<CreateSandboxRequest, 'template' | 'pe
   waitUntilReady?: WaitPreference;
 };
 
+const MOUNT_PATH_PATTERN = /^\/[A-Za-z0-9._/-]*$/;
+
 export class SandboxesResource {
   private readonly transport: HttpTransport;
   private readonly volumes: VolumesResource;
@@ -46,11 +48,13 @@ export class SandboxesResource {
    * before running commands or file operations.
    */
   public async create(input: CreateSandboxRequest, options?: RequestOptions): Promise<SandboxHandle> {
-    const region = await this.resolveRegionId(input.region, options);
+    const region = await this.resolveCreateRegionId(input, options);
     const body: CreateSandboxRequest = {
       ...input,
       region,
     };
+    this.applyMountPathDefault(body);
+    this.validateMountPath(body);
 
     const result = (await this.transport.requestJson<CreateSandboxResult>({
       endpoint: '/sandboxes',
@@ -263,6 +267,7 @@ export class SandboxesResource {
         ...createInput,
         persistent: true,
         persistentDiskGB,
+        mountPath: createInput.mountPath ?? '/workspace',
       },
       options,
     );
@@ -293,5 +298,57 @@ export class SandboxesResource {
     }
 
     return regionId;
+  }
+
+  private async resolveCreateRegionId(input: CreateSandboxRequest, options?: RequestOptions): Promise<string> {
+    if (input.region && input.region !== 'auto') {
+      return input.region;
+    }
+
+    if (typeof input.volumeId === 'string' && input.volumeId.length > 0) {
+      const volume = await this.volumes.get(input.volumeId, options);
+      const region = volume.region;
+      if (region && typeof region === 'object' && typeof region.id === 'string' && region.id.length > 0) {
+        return region.id;
+      }
+
+      throw new Error('Unable to infer region from attached volume. Pass `region` explicitly.');
+    }
+
+    return this.resolveRegionId(undefined, options);
+  }
+
+  private validateMountPath(input: CreateSandboxRequest): void {
+    const hasPersistentVolume = input.persistent === true;
+    const hasExistingVolume = typeof input.volumeId === 'string' && input.volumeId.length > 0;
+    const hasStorage = hasPersistentVolume || hasExistingVolume;
+    const hasMountPath = typeof input.mountPath === 'string' && input.mountPath.length > 0;
+
+    if (hasStorage && !hasMountPath) {
+      throw new Error('mountPath is required when using persistent storage (`persistent`/`persistentDiskGB` or `volumeId`).');
+    }
+
+    if (!hasMountPath) {
+      return;
+    }
+
+    if (!MOUNT_PATH_PATTERN.test(input.mountPath as string) || input.mountPath === '/') {
+      throw new Error('mountPath must match ^/[A-Za-z0-9._/-]*$ and cannot be "/".');
+    }
+
+    if (!hasPersistentVolume && !hasExistingVolume) {
+      throw new Error('mountPath requires either `persistent: true` or `volumeId`.');
+    }
+  }
+
+  private applyMountPathDefault(input: CreateSandboxRequest): void {
+    const hasPersistentVolume = input.persistent === true;
+    const hasExistingVolume = typeof input.volumeId === 'string' && input.volumeId.length > 0;
+    const hasStorage = hasPersistentVolume || hasExistingVolume;
+    const hasMountPath = typeof input.mountPath === 'string' && input.mountPath.length > 0;
+
+    if (hasStorage && !hasMountPath) {
+      input.mountPath = '/workspace';
+    }
   }
 }

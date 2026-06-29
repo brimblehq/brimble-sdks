@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import base64
 
-import requests
-
 from ..errors import AuthError
+from ..streaming import ByteStream
 from ..transport import HttpTransport, RequestOptions, RetryOptions
 from ..types import BatchFileUploadFileInput, FileUploadBody, SandboxBatchFileUpload, SandboxBatchFileUploadResult
 from .path import encode_file_path
@@ -51,14 +50,15 @@ class FilesResource:
         *,
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
-    ) -> requests.Response:
-        """Download a file from the sandbox as a streamed response."""
+    ) -> ByteStream:
+        """Download a file from the sandbox as an iterable byte stream."""
         options = RequestOptions(timeout_ms=timeout_ms, retry=retry)
-        return self._transport.request_stream(
+        response = self._transport.request_stream(
             endpoint=f"/sandboxes/{self._sandbox_id}/files/{encode_file_path(path)}",
             method="GET",
             options=options,
         )
+        return ByteStream(response)
 
     def put_batch(
         self,
