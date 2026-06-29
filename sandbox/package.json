@@ -1,6 +1,6 @@
 {
   "name": "@brimble/sandbox",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "TypeScript SDK for the Brimble Sandbox API",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
