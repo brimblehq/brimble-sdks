@@ -248,7 +248,7 @@ export class SandboxesResource {
       method: 'PUT',
       body: input,
       ...options,
-    });
+    }) as Promise<Sandbox>;
   }
 
   /** Use runtime operations for a specific sandbox id. */
