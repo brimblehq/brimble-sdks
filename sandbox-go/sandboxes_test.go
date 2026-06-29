@@ -281,3 +281,52 @@ func TestCreateInfersRegionFromAttachedVolumeWhenOmitted(t *testing.T) {
 		t.Fatalf("expected default mountPath /workspace, got %#v", seen["mountPath"])
 	}
 }
+
+func TestUpdateEgressSendsPutWithModeAndAllow(t *testing.T) {
+	t.Parallel()
+
+	var captured UpdateSandboxEgressInput
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/sandboxes/sandbox-123/egress" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"Sandbox egress updated","data":{"id":"sandbox-123","egress":{"mode":"restricted","allow":["1.1.1.1"]},"network_updated":true}}`))
+	}))
+	defer ts.Close()
+
+	client, err := NewClient(ClientConfig{
+		APIKey:  "test-key",
+		BaseURL: ts.URL,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	result, err := client.Sandboxes.UpdateEgress(context.Background(), "sandbox-123", UpdateSandboxEgressInput{
+		Mode:  SandboxEgressModeRestricted,
+		Allow: []string{"1.1.1.1"},
+	})
+	if err != nil {
+		t.Fatalf("update egress: %v", err)
+	}
+
+	if captured.Mode != SandboxEgressModeRestricted {
+		t.Fatalf("unexpected mode: %s", captured.Mode)
+	}
+	if len(captured.Allow) != 1 || captured.Allow[0] != "1.1.1.1" {
+		t.Fatalf("unexpected allow list: %#v", captured.Allow)
+	}
+	if result.Egress.Mode != SandboxEgressModeRestricted {
+		t.Fatalf("unexpected result mode: %s", result.Egress.Mode)
+	}
+	if result.NetworkUpdated == nil || !*result.NetworkUpdated {
+		t.Fatalf("expected network_updated=true, got %#v", result.NetworkUpdated)
+	}
+}

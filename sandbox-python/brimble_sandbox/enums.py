@@ -49,3 +49,9 @@ class SnapshotStatus(StrEnum):
 
 class VolumeType(StrEnum):
     SANDBOX = "sandbox"
+
+
+class SandboxEgressMode(StrEnum):
+    OPEN = "open"
+    RESTRICTED = "restricted"
+    DENY_ALL = "deny_all"

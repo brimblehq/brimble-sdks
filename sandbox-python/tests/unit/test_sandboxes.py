@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from brimble_sandbox import Sandbox
+from brimble_sandbox.enums import SandboxEgressMode
 
 
 def test_list_templates_handles_wrapped_payload() -> None:
@@ -219,3 +220,32 @@ def test_create_infers_region_from_attached_volume_when_omitted() -> None:
     assert body["region"] == "region-from-volume"
     assert body["volumeId"] == "volume-123"
     assert body["mountPath"] == "/workspace"
+
+
+def test_update_egress_sends_put_with_mode_and_allow() -> None:
+    client = Sandbox(api_key="test-key")
+    captured: dict[str, object] = {}
+
+    def fake_request_json(**kwargs: Any) -> object:
+        nonlocal captured
+        captured = kwargs
+        return {
+            "id": "sandbox-123",
+            "egress": {"mode": "restricted", "allow": ["1.1.1.1"]},
+            "network_updated": True,
+        }
+
+    client.sandboxes._transport.request_json = fake_request_json  # type: ignore[assignment]
+
+    result = client.sandboxes.update_egress(
+        "sandbox-123",
+        {"mode": SandboxEgressMode.RESTRICTED, "allow": ["1.1.1.1"]},
+    )
+
+    assert captured["endpoint"] == "/sandboxes/sandbox-123/egress"
+    assert captured["method"] == "PUT"
+    body = captured["body"]
+    assert isinstance(body, dict)
+    assert body["mode"] == "restricted"
+    assert body["allow"] == ["1.1.1.1"]
+    assert result["network_updated"] is True

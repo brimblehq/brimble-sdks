@@ -90,6 +90,31 @@ for sb in client.sandboxes.iterate({"teamId": "<team>"}):
 Volume attachment is create-time only.
 Use `create(..., volumeId=...)` or `with_volume(...)`.
 
+## Network egress
+
+```python
+from brimble_sandbox import Sandbox
+from brimble_sandbox.enums import SandboxEgressMode
+
+client = Sandbox()
+
+sandbox = client.sandboxes.create_ready({
+    "template": "node-22",
+    "egress": {
+        "mode": SandboxEgressMode.RESTRICTED,
+        "allow": ["1.1.1.1", "api.example.com"],
+    },
+})
+
+updated = sandbox.update_egress({"mode": SandboxEgressMode.DENY_ALL})
+print(updated.get("network_updated"))
+
+# Legacy shorthand (maps to deny_all)
+client.sandboxes.create({"template": "node-22", "blockOutbound": True})
+```
+
+Modes: `open`, `restricted` (allowlist required), `deny_all`.
+
 ## Auth
 
 Requests are authenticated with the `x-brimble-key` header.

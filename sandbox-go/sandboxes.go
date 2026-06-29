@@ -289,6 +289,16 @@ func (r *SandboxesResource) Resume(ctx context.Context, sandboxID string, option
 	return &out, nil
 }
 
+// UpdateEgress updates sandbox outbound network policy.
+func (r *SandboxesResource) UpdateEgress(ctx context.Context, sandboxID string, input UpdateSandboxEgressInput, options ...RequestOptions) (*Sandbox, error) {
+	var out Sandbox
+	_, err := r.client.doJSONWithOptions(ctx, http.MethodPut, "/sandboxes/"+sandboxID+"/egress", nil, input, &out, firstOptions(options...))
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // Use returns scoped runtime operations for one sandbox.
 func (r *SandboxesResource) Use(sandboxID string) *SandboxScope {
 	return newSandboxScope(r.client, sandboxID)

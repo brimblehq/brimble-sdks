@@ -88,6 +88,16 @@ func (h *SandboxHandle) Resume(ctx context.Context, options ...RequestOptions) (
 	return ack, nil
 }
 
+// UpdateEgress updates outbound network policy for this sandbox.
+func (h *SandboxHandle) UpdateEgress(ctx context.Context, input UpdateSandboxEgressInput, options ...RequestOptions) (*Sandbox, error) {
+	sandbox, err := h.sandboxes.UpdateEgress(ctx, h.ID(), input, options...)
+	if err != nil {
+		return nil, err
+	}
+	h.latest = sandbox
+	return sandbox, nil
+}
+
 // WaitUntilReady polls until sandbox status is ready using SDK defaults.
 func (h *SandboxHandle) WaitUntilReady(ctx context.Context) (*Sandbox, error) {
 	return h.WaitUntilReadyWithOptions(ctx, DefaultSandboxReadyTimeout, DefaultSandboxReadyPollInterval)

@@ -19,6 +19,7 @@ from ..types import (
     SandboxRegionsResult,
     SandboxTemplate,
     TeamScopedPagination,
+    UpdateSandboxEgressInput,
 )
 from .sandbox_handle import SandboxHandle
 from .scoped_sandbox import ScopedSandboxResource
@@ -327,6 +328,26 @@ class SandboxesResource:
             self._transport.request_json(
                 endpoint=f"/sandboxes/{sandbox_id}/resume",
                 method="POST",
+                options=_options(timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry),
+            ),
+        )
+
+    def update_egress(
+        self,
+        sandbox_id: str,
+        input: UpdateSandboxEgressInput,
+        *,
+        timeout_ms: int | None = None,
+        idempotency_key: str | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> dict[str, object]:
+        """Update sandbox outbound network policy."""
+        return cast(
+            dict[str, object],
+            self._transport.request_json(
+                endpoint=f"/sandboxes/{sandbox_id}/egress",
+                method="PUT",
+                body=input,
                 options=_options(timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry),
             ),
         )

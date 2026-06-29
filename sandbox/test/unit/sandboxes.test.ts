@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
 import { Sandbox } from '../../src/client';
+import { SandboxEgressMode } from '../../src/enums';
 
 describe('SandboxesResource templates helpers', () => {
   test('listTemplates handles wrapped data.templates payload', async () => {
@@ -85,5 +86,49 @@ describe('ScopedSandboxResource lifecycle helpers', () => {
 
     const [url] = fetchImpl.mock.calls[0] ?? [];
     expect(String(url)).toContain('/sandboxes/sandbox-123');
+  });
+});
+
+describe('SandboxesResource egress', () => {
+  test('updateEgress sends PUT with mode and allow list', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          message: 'Sandbox egress updated',
+          data: {
+            id: 'sandbox-123',
+            egress: { mode: 'restricted', allow: ['1.1.1.1'] },
+            network_updated: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    ) as typeof fetch;
+
+    const client = new Sandbox({
+      apiKey: 'test-key',
+      fetchImpl,
+    });
+
+    const result = await client.sandboxes.updateEgress('sandbox-123', {
+      mode: SandboxEgressMode.Restricted,
+      allow: ['1.1.1.1'],
+    });
+
+    expect(result.egress.mode).toBe('restricted');
+    expect(result.network_updated).toBe(true);
+
+    const [, requestInit] = fetchImpl.mock.calls[0] ?? [];
+    expect(requestInit?.method).toBe('PUT');
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      mode: 'restricted',
+      allow: ['1.1.1.1'],
+    });
+
+    const [url] = fetchImpl.mock.calls[0] ?? [];
+    expect(String(url)).toContain('/sandboxes/sandbox-123/egress');
   });
 });

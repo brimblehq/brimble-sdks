@@ -16,6 +16,7 @@ import type {
   SandboxRegionsResult,
   SandboxTemplate,
   TeamScopedPagination,
+  UpdateSandboxEgressInput,
   Volume,
   WaitPreference,
 } from '../types';
@@ -232,6 +233,20 @@ export class SandboxesResource {
     return this.transport.requestJson<AckMessage>({
       endpoint: `/sandboxes/${sandboxId}/resume`,
       method: 'POST',
+      ...options,
+    });
+  }
+
+  /** Update sandbox outbound network policy. */
+  public updateEgress(
+    sandboxId: string,
+    input: UpdateSandboxEgressInput,
+    options?: RequestOptions,
+  ): Promise<Sandbox> {
+    return this.transport.requestJson<Sandbox>({
+      endpoint: `/sandboxes/${sandboxId}/egress`,
+      method: 'PUT',
+      body: input,
       ...options,
     });
   }

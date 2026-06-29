@@ -117,6 +117,36 @@ await sandbox.snapshots.create({ name: 'before-migration' });
 Volume attachment is create-time only.  
 Use `client.sandboxes.create({ ..., volumeId })` or `client.sandboxes.withVolume(...)`.
 
+## Network egress
+
+Control outbound network access when creating or updating a sandbox.
+
+```ts
+import { Sandbox, SandboxEgressMode } from '@brimble/sandbox';
+
+const client = new Sandbox();
+
+// Create with restricted egress (allowlist)
+const sandbox = await client.sandboxes.createReady({
+  template: 'node-22',
+  egress: {
+    mode: SandboxEgressMode.Restricted,
+    allow: ['1.1.1.1', 'api.example.com'],
+  },
+});
+
+// Update egress at runtime
+const updated = await sandbox.updateEgress({
+  mode: SandboxEgressMode.DenyAll,
+});
+console.log(updated.network_updated); // true when Nomad network mode changed
+
+// Legacy shorthand (maps to deny_all)
+await client.sandboxes.create({ template: 'node-22', blockOutbound: true });
+```
+
+Modes: `open` (full internet), `restricted` (allowlist required), `deny_all` (no outbound).
+
 ## Retry, timeouts, and idempotency
 
 ```ts
@@ -140,9 +170,9 @@ If `region` is omitted, the SDK resolves the first available sandbox region auto
 ## Resources
 
 - `client.sandboxes`
-  - `create`, `createReady`, `withVolume`, `list`, `iterate`, `get`, `getReady`, `listRegions`, `listTemplates`, `getTemplate`, `destroy`, `pause`, `resume`, `quickstartNode`, `quickstartPython`, `use`
+  - `create`, `createReady`, `withVolume`, `list`, `iterate`, `get`, `getReady`, `listRegions`, `listTemplates`, `getTemplate`, `destroy`, `pause`, `resume`, `updateEgress`, `quickstartNode`, `quickstartPython`, `use`
 - `sandbox` handle (returned from `create/get/list`)
-  - `waitUntilReady`, `refresh`, `destroy`, `pause`, `resume`, `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`, `snapshots.create`, `snapshots.list`
+  - `waitUntilReady`, `refresh`, `destroy`, `pause`, `resume`, `updateEgress`, `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`, `snapshots.create`, `snapshots.list`
 - `client.sandboxes.use(id)`
   - `destroy`, `exec`, `runCode`, `putFile`, `putFiles`, `getFile`, `stats`, `createSnapshot`, `listSnapshots`
 - `client.snapshots`

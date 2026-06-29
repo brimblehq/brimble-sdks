@@ -23,6 +23,7 @@ import type {
   StatsQuery,
   WaitPreference,
   WaitUntilReadyOptions,
+  UpdateSandboxEgressInput,
 } from '../types';
 import { ScopedSandboxResource } from './scoped-sandbox';
 import type { SandboxesResource } from './sandboxes';
@@ -96,6 +97,13 @@ export class SandboxHandle {
     const response = await this.sandboxes.resume(this.id, options);
     await this.refresh(options);
     return response;
+  }
+
+  /** Update outbound network policy for this sandbox and refresh local state. */
+  public async updateEgress(input: UpdateSandboxEgressInput, options?: RequestOptions): Promise<Sandbox> {
+    const sandbox = await this.sandboxes.updateEgress(this.id, input, options);
+    this.sandboxState = sandbox;
+    return sandbox;
   }
 
   /**

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import IO, Iterable, Literal, TypedDict, Union
+from typing import IO, Iterable, Literal, NotRequired, TypedDict, Union
 
-from .enums import CodeLanguage, DestroyReason, DestroyTimeout, SandboxStatus, SnapshotMode, SnapshotStatus, VolumeType
+from .enums import CodeLanguage, DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxStatus, SnapshotMode, SnapshotStatus, VolumeType
 
 FileUploadBody = Union[bytes, bytearray, IO[bytes], Iterable[bytes]]
 BatchFileUploadBody = Union[bytes, bytearray, str]
@@ -60,6 +60,16 @@ class SandboxSpecs(TypedDict, total=False):
     disk: int
 
 
+class SandboxEgressConfig(TypedDict, total=False):
+    mode: SandboxEgressMode
+    allow: list[str]
+
+
+class UpdateSandboxEgressInput(TypedDict, total=False):
+    mode: SandboxEgressMode
+    allow: list[str]
+
+
 class CreateSandboxInput(TypedDict, total=False):
     name: str
     template: str
@@ -71,6 +81,7 @@ class CreateSandboxInput(TypedDict, total=False):
     destroyTimeout: DestroyTimeout
     oneShot: bool
     blockOutbound: bool
+    egress: SandboxEgressConfig
     persistent: bool
     persistentDiskGB: int
     volumeId: str
@@ -91,6 +102,7 @@ class CreateSandboxRequest(TypedDict, total=False):
     destroyTimeout: DestroyTimeout
     oneShot: bool
     blockOutbound: bool
+    egress: SandboxEgressConfig
     persistent: bool
     persistentDiskGB: int
     volumeId: str
@@ -122,6 +134,7 @@ class Sandbox(TypedDict):
     destroy_timeout: DestroyTimeout | None
     one_shot: bool
     block_outbound: bool
+    egress: SandboxEgressConfig
     persistent: bool
     persistent_disk_gb: int | None
     paused_at: str | None
@@ -133,6 +146,7 @@ class Sandbox(TypedDict):
     expires_at: str
     destroyed_at: str | None
     destroy_reason: DestroyReason | None
+    network_updated: NotRequired[bool]
 
 
 class AckMessage(TypedDict):

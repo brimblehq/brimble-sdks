@@ -64,6 +64,24 @@ const (
 	VolumeTypeSandbox VolumeType = "sandbox"
 )
 
+type SandboxEgressMode string
+
+const (
+	SandboxEgressModeOpen       SandboxEgressMode = "open"
+	SandboxEgressModeRestricted SandboxEgressMode = "restricted"
+	SandboxEgressModeDenyAll    SandboxEgressMode = "deny_all"
+)
+
+type SandboxEgressConfig struct {
+	Mode  SandboxEgressMode `json:"mode"`
+	Allow []string          `json:"allow,omitempty"`
+}
+
+type UpdateSandboxEgressInput struct {
+	Mode  SandboxEgressMode `json:"mode"`
+	Allow []string          `json:"allow,omitempty"`
+}
+
 type Pagination struct {
 	Page  int
 	Limit int
@@ -124,9 +142,10 @@ type CreateSandboxRequest struct {
 	Specs             *SandboxSpecs  `json:"specs,omitempty"`
 	AutoDestroy       *bool          `json:"autoDestroy,omitempty"`
 	DestroyTimeout    DestroyTimeout `json:"destroyTimeout,omitempty"`
-	OneShot           *bool          `json:"oneShot,omitempty"`
-	BlockOutbound     *bool          `json:"blockOutbound,omitempty"`
-	Persistent        *bool          `json:"persistent,omitempty"`
+	OneShot           *bool                `json:"oneShot,omitempty"`
+	BlockOutbound     *bool                `json:"blockOutbound,omitempty"`
+	Egress            *SandboxEgressConfig `json:"egress,omitempty"`
+	Persistent        *bool                `json:"persistent,omitempty"`
 	PersistentDiskGB  *int           `json:"persistentDiskGB,omitempty"`
 	VolumeID          string         `json:"volumeId,omitempty"`
 	MountPath         string         `json:"mountPath,omitempty"`
@@ -162,9 +181,10 @@ type Sandbox struct {
 	ProjectEnv       *string         `json:"project_environment"`
 	AutoDestroy      bool            `json:"auto_destroy"`
 	DestroyTimeout   *DestroyTimeout `json:"destroy_timeout"`
-	OneShot          bool            `json:"one_shot"`
-	BlockOutbound    bool            `json:"block_outbound"`
-	Persistent       bool            `json:"persistent"`
+	OneShot          bool                 `json:"one_shot"`
+	BlockOutbound    bool                 `json:"block_outbound"`
+	Egress           SandboxEgressConfig  `json:"egress"`
+	Persistent       bool                 `json:"persistent"`
 	PersistentDiskGB *int            `json:"persistent_disk_gb"`
 	PausedAt         *time.Time      `json:"paused_at"`
 	FromSnapshot     *string         `json:"from_snapshot"`
@@ -173,8 +193,9 @@ type Sandbox struct {
 	CreatedAt        time.Time       `json:"created_at"`
 	LastActivityAt   time.Time       `json:"last_activity_at"`
 	ExpiresAt        time.Time       `json:"expires_at"`
-	DestroyedAt      *time.Time      `json:"destroyed_at"`
-	DestroyReason    *DestroyReason  `json:"destroy_reason"`
+	DestroyedAt      *time.Time           `json:"destroyed_at"`
+	DestroyReason    *DestroyReason       `json:"destroy_reason"`
+	NetworkUpdated   *bool                `json:"network_updated,omitempty"`
 }
 
 type AckMessage struct {

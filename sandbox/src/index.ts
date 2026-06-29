@@ -31,6 +31,7 @@ export {
   SandboxStatus,
   SnapshotMode,
   SnapshotStatus,
+  SandboxEgressMode,
   VolumeType,
 } from './enums';
 
@@ -64,6 +65,7 @@ export type {
   SandboxRegion,
   SandboxRegionsResult,
   Sandbox as SandboxData,
+  SandboxEgressConfig,
   SandboxSpecs,
   Snapshot,
   Stats,
@@ -73,6 +75,7 @@ export type {
   StatsTimelinePoint,
   TeamScopedPagination,
   WaitUntilReadyOptions,
+  UpdateSandboxEgressInput,
   Volume,
 } from './types';
 

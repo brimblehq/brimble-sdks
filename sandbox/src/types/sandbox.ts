@@ -1,7 +1,17 @@
-import { DestroyReason, DestroyTimeout, SandboxStatus, SnapshotMode } from '../enums';
+import { DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxStatus, SnapshotMode } from '../enums';
 import type { RequestOptions } from '../transport/http';
 import type { RegionSummary } from './region';
 import type { CreateVolumeInput, Volume } from './volume';
+
+export type SandboxEgressConfig = {
+  mode: SandboxEgressMode;
+  allow?: string[];
+};
+
+export type UpdateSandboxEgressInput = {
+  mode: SandboxEgressMode;
+  allow?: string[];
+};
 
 export type SandboxSpecs = {
   cpu?: number;
@@ -22,6 +32,7 @@ export type CreateSandboxInput = {
   destroyTimeout?: DestroyTimeout;
   oneShot?: boolean;
   blockOutbound?: boolean;
+  egress?: SandboxEgressConfig;
   persistent?: boolean;
   persistentDiskGB?: number;
   volumeId?: string;
@@ -57,6 +68,7 @@ export type Sandbox = {
   destroy_timeout: DestroyTimeout | null;
   one_shot: boolean;
   block_outbound: boolean;
+  egress: SandboxEgressConfig;
   persistent: boolean;
   persistent_disk_gb: number | null;
   paused_at: string | null;
@@ -68,6 +80,7 @@ export type Sandbox = {
   expires_at: string;
   destroyed_at: string | null;
   destroy_reason: DestroyReason | null;
+  network_updated?: boolean;
 };
 
 export type AckMessage = {

@@ -19,6 +19,7 @@ from ..types import (
     FileUploadBody,
     Pagination,
     StatsQuery,
+    UpdateSandboxEgressInput,
     WaitPreference,
 )
 from ..types import ExecResult
@@ -97,6 +98,25 @@ class SandboxHandle:
         response = self._sandboxes.resume(self.id, timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry)
         self.refresh(timeout_ms=timeout_ms, retry=retry)
         return response
+
+    def update_egress(
+        self,
+        input: UpdateSandboxEgressInput,
+        *,
+        timeout_ms: int | None = None,
+        idempotency_key: str | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> dict[str, object]:
+        """Update outbound network policy for this sandbox and refresh local state."""
+        sandbox = self._sandboxes.update_egress(
+            self.id,
+            input,
+            timeout_ms=timeout_ms,
+            idempotency_key=idempotency_key,
+            retry=retry,
+        )
+        self._state = sandbox
+        return sandbox
 
     def wait_until_ready(
         self,

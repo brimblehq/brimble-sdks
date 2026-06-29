@@ -10,12 +10,14 @@ export type {
   CreateSandboxWithVolumeInput,
   CreateSandboxWithVolumeResult,
   Sandbox,
+  SandboxEgressConfig,
   SandboxReadyRequestOptions,
   SandboxRegionInput,
   SandboxRuntimeOptions,
   SandboxSpecs,
   WaitPreference,
   WaitUntilReadyOptions,
+  UpdateSandboxEgressInput,
 } from './sandbox';
 export type { CreateSnapshotInput, Snapshot } from './snapshot';
 export type { Stats, StatsAverageNetwork, StatsAverageNumeric, StatsQuery, StatsTimelinePoint } from './stats';

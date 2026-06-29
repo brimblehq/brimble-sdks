@@ -100,6 +100,31 @@ func ptrInt(v int) *int { return &v }
 Volume attachment is create-time only.
 Use `CreateSandboxRequest{VolumeID: ...}` or `Sandboxes.WithVolume(...)`.
 
+## Network egress
+
+```go
+sandbox, err := client.Sandboxes.CreateReady(ctx, CreateSandboxRequest{
+	Template: "node-22",
+	Egress: &SandboxEgressConfig{
+		Mode:  SandboxEgressModeRestricted,
+		Allow: []string{"1.1.1.1", "api.example.com"},
+	},
+})
+
+updated, err := sandbox.UpdateEgress(ctx, UpdateSandboxEgressInput{
+	Mode: SandboxEgressModeDenyAll,
+})
+_ = updated.NetworkUpdated
+
+// Legacy shorthand (maps to deny_all)
+client.Sandboxes.Create(ctx, CreateSandboxRequest{
+	Template:      "node-22",
+	BlockOutbound: ptrBool(true),
+})
+```
+
+Modes: `open`, `restricted` (allowlist required), `deny_all`.
+
 If `Region` is empty, the SDK resolves the first available sandbox region automatically.
 
 ## Errors
