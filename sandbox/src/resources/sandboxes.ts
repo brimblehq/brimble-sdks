@@ -1,4 +1,4 @@
-import { DEFAULT_PAGE, DEFAULT_PAGE_LIMIT } from '../constants';
+import { DEFAULT_PAGE, DEFAULT_PAGE_LIMIT, DEFAULT_SANDBOX_CREATE_TIMEOUT_MS } from '../constants';
 import { VolumeType } from '../enums';
 import type { RequestOptions } from '../transport/http';
 import { HttpTransport } from '../transport/http';
@@ -43,10 +43,10 @@ export class SandboxesResource {
   }
 
   /**
-   * Create a new sandbox.
+   * Create a new sandbox and wait until it is ready (~2–3s).
    * Region is optional; when omitted the API assigns an enabled sandbox region.
    * Pass a region slug (e.g. `eu-west`) or id to pin placement.
-   * The sandbox starts asynchronously — use `waitUntilReady()` before runtime operations.
+   * Returns a handle with `status: ready` — no polling required before exec.
    */
   public async create(input: CreateSandboxRequest, options?: RequestOptions): Promise<SandboxHandle> {
     const body = this.buildCreateBody(input);
@@ -57,39 +57,45 @@ export class SandboxesResource {
       endpoint: '/sandboxes',
       method: 'POST',
       body,
+      timeoutMs: DEFAULT_SANDBOX_CREATE_TIMEOUT_MS,
       ...options,
     })) as CreateSandboxResult;
 
     return new SandboxHandle(this, result);
   }
 
-  /** Create a sandbox and wait until it is `ready` before returning it. */
+  /** @deprecated Alias of `create()` — create is always synchronous and returns a ready sandbox. */
   public async createReady(input: CreateSandboxRequest, options: SandboxReadyRequestOptions = {}): Promise<SandboxHandle> {
-    const sandbox = await this.create(input, options.request);
-    await sandbox.waitUntilReady(options.wait);
-    return sandbox;
+    return this.create(input, options.request);
   }
 
   /**
    * Create a volume and then create a sandbox attached to that volume.
-   * This is the one-call helper for persistent sandbox workflows.
+   *
+   * Region resolution applies only to volume create — `POST /volumes` requires an
+   * explicit region. Sandbox create omits `region` when attaching via `volumeId`;
+   * the API infers placement from the volume.
    */
   public async withVolume(input: CreateSandboxWithVolumeInput, options?: RequestOptions): Promise<SandboxHandle> {
-    const region = await this.resolveRegionId(input.sandbox.region ?? input.volume.region, options);
+    const regionForVolume = await this.resolveRegionId(
+      input.volume.region ?? input.sandbox.region,
+      options,
+    );
 
     const volume = await this.volumes.create(
       {
         ...input.volume,
-        region,
+        region: regionForVolume,
         type: VolumeType.Sandbox,
       },
       options,
     );
 
+    const { region: _region, ...sandboxInput } = input.sandbox;
+
     return this.create(
       {
-        ...input.sandbox,
-        region,
+        ...sandboxInput,
         volumeId: volume.id,
       },
       options,
@@ -297,9 +303,9 @@ export class SandboxesResource {
   }
 
   private async quickstart(input: QuickstartSandboxInput, options?: RequestOptions): Promise<SandboxHandle> {
-    const { waitUntilReady, persistentDiskGB, ...createInput } = input;
+    const { waitUntilReady: _waitUntilReady, persistentDiskGB, ...createInput } = input;
 
-    const sandbox = await this.create(
+    return this.create(
       {
         ...createInput,
         persistent: true,
@@ -308,18 +314,6 @@ export class SandboxesResource {
       },
       options,
     );
-
-    if (waitUntilReady === false) {
-      return sandbox;
-    }
-
-    if (typeof waitUntilReady === 'object') {
-      await sandbox.waitUntilReady(waitUntilReady);
-      return sandbox;
-    }
-
-    await sandbox.waitUntilReady();
-    return sandbox;
   }
 
   private async resolveRegionId(region: SandboxRegionInput | undefined, options?: RequestOptions): Promise<string> {

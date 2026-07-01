@@ -28,7 +28,7 @@ func main() {
 		panic(err)
 	}
 
-		handle, err := client.Sandboxes.CreateReady(
+		handle, err := client.Sandboxes.Create(
 			ctx,
 			sandbox.CreateSandboxRequest{
 				Template:        "node-22",
@@ -36,7 +36,6 @@ func main() {
 				PersistentDiskGB: ptrInt(20),
 				MountPath:       "/workspace",
 			},
-			nil,
 		)
 	if err != nil {
 		panic(err)

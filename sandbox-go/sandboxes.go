@@ -16,11 +16,11 @@ type SandboxesResource struct {
 	client *Client
 }
 
-// Create creates a sandbox and returns a handle for direct runtime operations.
+// Create creates a sandbox and returns a ready handle (~2–3s blocking POST).
 // Region is optional; when omitted the API assigns an enabled sandbox region.
 // Pass a region slug (e.g. eu-west) or id to pin placement.
 func (r *SandboxesResource) Create(ctx context.Context, input CreateSandboxRequest, options ...RequestOptions) (*SandboxHandle, error) {
-	requestOptions := firstOptions(options...)
+	requestOptions := createRequestOptions(options...)
 	applyMountPathDefault(&input)
 	if err := validateMountPath(input); err != nil {
 		return nil, err
@@ -36,40 +36,28 @@ func (r *SandboxesResource) Create(ctx context.Context, input CreateSandboxReque
 	return newSandboxHandle(r, out), nil
 }
 
-// CreateReady creates a sandbox and waits until it becomes ready.
+// CreateReady is deprecated — Create already blocks until the sandbox is ready.
 func (r *SandboxesResource) CreateReady(ctx context.Context, input CreateSandboxRequest, wait *WaitOptions, options ...RequestOptions) (*SandboxHandle, error) {
-	handle, err := r.Create(ctx, input, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	if wait == nil {
-		_, err = handle.WaitUntilReady(ctx)
-	} else {
-		_, err = handle.WaitUntilReadyWithOptions(ctx, wait.Timeout, wait.PollInterval)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return handle, nil
+	return r.Create(ctx, input, options...)
 }
 
 // WithVolume creates a sandbox-only volume, then creates a sandbox attached to it.
+// Region resolution applies only to volume create (volumes require an explicit region).
+// Sandbox create omits region; the API infers placement from volumeId.
 func (r *SandboxesResource) WithVolume(ctx context.Context, input CreateSandboxWithVolumeInput, options ...RequestOptions) (*SandboxHandle, error) {
 	requestOptions := firstOptions(options...)
 
-	regionHint := input.Sandbox.Region
+	regionHint := input.Volume.Region
 	if regionHint == "" {
-		regionHint = input.Volume.Region
+		regionHint = input.Sandbox.Region
 	}
-	resolvedRegion, err := r.resolveRegionID(ctx, regionHint, requestOptions)
+	regionForVolume, err := r.resolveRegionID(ctx, regionHint, requestOptions)
 	if err != nil {
 		return nil, err
 	}
 
 	volumeInput := input.Volume
-	volumeInput.Region = resolvedRegion
+	volumeInput.Region = regionForVolume
 	volumeInput.Type = VolumeTypeSandbox
 	volume, err := r.client.Volumes.Create(ctx, volumeInput, options...)
 	if err != nil {
@@ -77,7 +65,7 @@ func (r *SandboxesResource) WithVolume(ctx context.Context, input CreateSandboxW
 	}
 
 	sandboxInput := input.Sandbox
-	sandboxInput.Region = resolvedRegion
+	sandboxInput.Region = ""
 	sandboxInput.VolumeID = volume.ID
 
 	return r.Create(ctx, sandboxInput, options...)
@@ -334,54 +322,32 @@ func (r *SandboxesResource) Use(sandboxID string) *SandboxScope {
 	return newSandboxScope(r.client, sandboxID)
 }
 
-// QuickstartNode creates a Node sandbox with practical defaults.
-func (r *SandboxesResource) QuickstartNode(ctx context.Context, region string, wait bool, options ...RequestOptions) (*SandboxHandle, error) {
+// QuickstartNode creates a ready Node sandbox with practical defaults.
+func (r *SandboxesResource) QuickstartNode(ctx context.Context, region string, options ...RequestOptions) (*SandboxHandle, error) {
 	disk := 20
 	persistent := true
 
-	handle, err := r.Create(ctx, CreateSandboxRequest{
+	return r.Create(ctx, CreateSandboxRequest{
 		Region:           region,
 		Template:         "node-22",
 		Persistent:       &persistent,
 		PersistentDiskGB: &disk,
 		MountPath:        "/workspace",
 	}, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	if wait {
-		if _, err := handle.WaitUntilReady(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	return handle, nil
 }
 
-// QuickstartPython creates a Python sandbox with practical defaults.
-func (r *SandboxesResource) QuickstartPython(ctx context.Context, region string, wait bool, options ...RequestOptions) (*SandboxHandle, error) {
+// QuickstartPython creates a ready Python sandbox with practical defaults.
+func (r *SandboxesResource) QuickstartPython(ctx context.Context, region string, options ...RequestOptions) (*SandboxHandle, error) {
 	disk := 20
 	persistent := true
 
-	handle, err := r.Create(ctx, CreateSandboxRequest{
+	return r.Create(ctx, CreateSandboxRequest{
 		Region:           region,
 		Template:         "python-3.12",
 		Persistent:       &persistent,
 		PersistentDiskGB: &disk,
 		MountPath:        "/workspace",
 	}, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	if wait {
-		if _, err := handle.WaitUntilReady(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	return handle, nil
 }
 
 func (r *SandboxesResource) resolveRegionID(ctx context.Context, region string, requestOptions *RequestOptions) (string, error) {
@@ -447,6 +413,19 @@ func firstOptions(options ...RequestOptions) *RequestOptions {
 	}
 	copy := options[0]
 	return &copy
+}
+
+func createRequestOptions(options ...RequestOptions) *RequestOptions {
+	ro := firstOptions(options...)
+	if ro == nil {
+		return &RequestOptions{Timeout: DefaultSandboxCreateTimeout}
+	}
+	if ro.Timeout <= 0 {
+		copy := *ro
+		copy.Timeout = DefaultSandboxCreateTimeout
+		return &copy
+	}
+	return ro
 }
 
 func derefOptions(option *RequestOptions) []RequestOptions {

@@ -28,7 +28,7 @@ import { CodeLanguage, Sandbox } from '@brimble/sandbox';
 
 const client = new Sandbox();
 
-const sandbox = await client.sandboxes.createReady({
+const sandbox = await client.sandboxes.create({
   template: 'node-22',
   persistent: true,
   persistentDiskGB: 20,
@@ -61,13 +61,16 @@ If needed, pass `apiKey` explicitly in the constructor; explicit value wins over
 ## Ergonomic helpers
 
 ```ts
-// 1) Create + wait in one call
-const created = await client.sandboxes.createReady({ template: 'node-22' });
+// 1) Create returns a ready sandbox (~2-3s blocking POST)
+const created = await client.sandboxes.create({ template: 'node-22' });
 
-// 2) Get + wait in one call
+// createReady() is an alias of create() (deprecated)
+const alsoReady = await client.sandboxes.createReady({ template: 'node-22' });
+
+// 2) Get + wait in one call (for resume/reconnect)
 const loaded = await client.sandboxes.getReady(created.id);
 
-// 3) Create a volume + attach in one call
+// 3) Create a volume + attach in one call (region resolved for volume only)
 const withVolume = await client.sandboxes.withVolume({
   sandbox: { template: 'node-22', mountPath: '/var/www/html' },
   volume: { name: 'workspace-disk', sizeGB: 20 },

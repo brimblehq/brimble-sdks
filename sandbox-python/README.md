@@ -15,7 +15,7 @@ from brimble_sandbox import Sandbox
 
 client = Sandbox()  # reads BRIMBLE_SANDBOX_KEY from env
 
-sandbox = client.sandboxes.create_ready(
+sandbox = client.sandboxes.create(
     {
         "template": "node-22",
         "persistent": True,
@@ -41,10 +41,13 @@ existing.destroy()
 ## Ergonomic helpers
 
 ```python
-# Create + wait in one call
-created = client.sandboxes.create_ready({"template": "node-22"})
+# Create returns a ready sandbox (~2-3s blocking POST)
+created = client.sandboxes.create({"template": "node-22"})
 
-# Get + wait in one call
+# create_ready() is a deprecated alias of create()
+also_ready = client.sandboxes.create_ready({"template": "node-22"})
+
+# Get + wait in one call (for resume/reconnect)
 loaded = client.sandboxes.get_ready(created.id)
 
 # Create volume + attach at sandbox creation time

@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { Sandbox } from '../../src/client';
 import { MIN_VOLUME_SIZE_GB } from '../../src/constants';
 import { NotFoundError } from '../../src/errors';
-import { CodeLanguage, VolumeType } from '../../src/enums';
+import { CodeLanguage, SandboxStatus, VolumeType } from '../../src/enums';
 import type { CreateSandboxRequest, SandboxHandle, SandboxTemplate } from '../../src/types';
 
 const apiKey = process.env.BRIMBLE_SANDBOX_KEY;
@@ -51,19 +51,14 @@ async function createReadySandboxWithRetries(
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const sandbox = await client.sandboxes.create(input);
-
     try {
-      await sandbox.waitUntilReady({ timeoutMs: 180_000, pollIntervalMs: 2_000 });
+      const sandbox = await client.sandboxes.create(input);
+      if (sandbox.status !== SandboxStatus.Ready) {
+        throw new Error(`Expected ready sandbox, got ${sandbox.status}`);
+      }
       return sandbox;
     } catch (error) {
       lastError = error;
-
-      try {
-        await sandbox.destroy();
-      } catch {
-        // Ignore cleanup failure for transient provisioner attempts.
-      }
 
       if (!isNotFoundError(error) || attempt === attempts) {
         throw error;

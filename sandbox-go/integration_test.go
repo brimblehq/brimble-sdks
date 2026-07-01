@@ -136,11 +136,11 @@ func TestIntegrationRuntimeSnapshotFlow(t *testing.T) {
 		t.Fatalf("failed to select template name")
 	}
 
-	handle, err := client.Sandboxes.CreateReady(ctx, CreateSandboxRequest{
+	handle, err := client.Sandboxes.Create(ctx, CreateSandboxRequest{
 		Template:         templateName,
 		Persistent:       ptrBool(true),
 		PersistentDiskGB: ptrInt(MinVolumeSizeGB),
-	}, &WaitOptions{Timeout: 180 * time.Second, PollInterval: 2 * time.Second})
+	})
 	if err != nil {
 		t.Fatalf("create ready sandbox: %v", err)
 	}

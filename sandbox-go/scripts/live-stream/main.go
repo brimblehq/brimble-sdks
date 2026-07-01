@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	sandbox "github.com/brimblehq/brimble-sdks/sandbox-go"
 )
@@ -27,9 +26,9 @@ func main() {
 	}
 
 	fmt.Println("Creating sandbox...")
-	handle, err := client.Sandboxes.CreateReady(ctx, sandbox.CreateSandboxRequest{
+	handle, err := client.Sandboxes.Create(ctx, sandbox.CreateSandboxRequest{
 		Template: "node-22",
-	}, &sandbox.WaitOptions{Timeout: 120 * time.Second, PollInterval: 2 * time.Second})
+	})
 	if err != nil {
 		panic(err)
 	}

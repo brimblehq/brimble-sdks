@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Iterator, cast
 
-from ..constants import DEFAULT_PAGE, DEFAULT_PAGE_LIMIT
+from ..constants import DEFAULT_PAGE, DEFAULT_PAGE_LIMIT, DEFAULT_SANDBOX_CREATE_TIMEOUT_MS
 from ..enums import VolumeType
 from ..transport import HttpTransport, RequestOptions, RetryOptions
 from ..types import (
@@ -43,10 +43,12 @@ class SandboxesResource:
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
-        """Create a sandbox. Region is optional; omitted means the API assigns a region."""
+        """Create a sandbox and block until it is ready (~2–3s). Region is optional."""
         body = self._build_create_body(input)
         self._apply_mount_path_default(body)
         self._validate_mount_path(body)
+
+        effective_timeout_ms = timeout_ms if timeout_ms is not None else DEFAULT_SANDBOX_CREATE_TIMEOUT_MS
 
         result = cast(
             CreateSandboxResult,
@@ -54,7 +56,7 @@ class SandboxesResource:
                 endpoint="/sandboxes",
                 method="POST",
                 body=body,
-                options=_options(timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry),
+                options=_options(timeout_ms=effective_timeout_ms, idempotency_key=idempotency_key, retry=retry),
             ),
         )
         return SandboxHandle(self, result)
@@ -69,15 +71,15 @@ class SandboxesResource:
         wait_timeout_ms: int | None = None,
         wait_poll_interval_ms: int | None = None,
     ) -> SandboxHandle:
-        """Create a sandbox and wait until it is ready before returning."""
-        sandbox = self.create(
+        """Deprecated alias of create() — create already returns a ready sandbox."""
+        _ = wait_timeout_ms
+        _ = wait_poll_interval_ms
+        return self.create(
             input,
             timeout_ms=timeout_ms,
             idempotency_key=idempotency_key,
             retry=retry,
         )
-        sandbox.wait_until_ready(timeout_ms=wait_timeout_ms, poll_interval_ms=wait_poll_interval_ms)
-        return sandbox
 
     def with_volume(
         self,
@@ -87,12 +89,16 @@ class SandboxesResource:
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
-        """Create a sandbox volume first, then create a sandbox attached to it."""
-        sandbox_input = input["sandbox"]
+        """Create a sandbox volume first, then create a sandbox attached to it.
+
+        Region resolution applies only to volume create (volumes require an explicit
+        region). Sandbox create omits region; the API infers placement from volumeId.
+        """
+        sandbox_input = dict(input["sandbox"])
         volume_input = input["volume"]
 
-        resolved_region = self._resolve_region_id(
-            cast(SandboxRegionInput | None, sandbox_input.get("region") or volume_input.get("region")),
+        region_for_volume = self._resolve_region_id(
+            cast(SandboxRegionInput | None, volume_input.get("region") or sandbox_input.get("region")),
             timeout_ms=timeout_ms,
         )
 
@@ -100,7 +106,7 @@ class SandboxesResource:
             {
                 "name": volume_input["name"],
                 "sizeGB": volume_input["sizeGB"],
-                "region": resolved_region,
+                "region": region_for_volume,
                 "teamId": volume_input.get("teamId"),
                 "type": VolumeType.SANDBOX,
             },
@@ -108,10 +114,9 @@ class SandboxesResource:
             retry=retry,
         )
 
-        body: CreateSandboxRequest = dict(sandbox_input)
+        body: CreateSandboxRequest = sandbox_input
+        body.pop("region", None)
         body["volumeId"] = str(volume["id"])
-        if resolved_region and resolved_region != "auto":
-            body["region"] = resolved_region
 
         return self.create(
             body,
@@ -400,11 +405,10 @@ class SandboxesResource:
         self,
         *,
         region: SandboxRegionInput | None = "auto",
-        wait_until_ready: bool = True,
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
-        """Create a Node sandbox with practical defaults."""
+        """Create a ready Node sandbox with practical defaults."""
         create_input: CreateSandboxRequest = {
             "template": "node-22",
             "persistent": True,
@@ -414,26 +418,20 @@ class SandboxesResource:
         if region and region != "auto":
             create_input["region"] = region
 
-        sandbox = self.create(
+        return self.create(
             create_input,
             timeout_ms=timeout_ms,
             retry=retry,
         )
 
-        if wait_until_ready:
-            sandbox.wait_until_ready()
-
-        return sandbox
-
     def quickstart_python(
         self,
         *,
         region: SandboxRegionInput | None = "auto",
-        wait_until_ready: bool = True,
         timeout_ms: int | None = None,
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
-        """Create a Python sandbox with practical defaults."""
+        """Create a ready Python sandbox with practical defaults."""
         create_input: CreateSandboxRequest = {
             "template": "python-3.12",
             "persistent": True,
@@ -443,16 +441,11 @@ class SandboxesResource:
         if region and region != "auto":
             create_input["region"] = region
 
-        sandbox = self.create(
+        return self.create(
             create_input,
             timeout_ms=timeout_ms,
             retry=retry,
         )
-
-        if wait_until_ready:
-            sandbox.wait_until_ready()
-
-        return sandbox
 
     def _resolve_region_id(self, region: SandboxRegionInput | None, *, timeout_ms: int | None = None) -> str:
         if region and region != "auto":
