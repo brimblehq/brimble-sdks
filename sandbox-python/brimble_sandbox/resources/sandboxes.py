@@ -43,12 +43,10 @@ class SandboxesResource:
         idempotency_key: str | None = None,
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
-        """Create a sandbox. Region is optional; omitted means auto-select first available region."""
-        body: CreateSandboxRequest = dict(input)
+        """Create a sandbox. Region is optional; omitted means the API assigns a region."""
+        body = self._build_create_body(input)
         self._apply_mount_path_default(body)
         self._validate_mount_path(body)
-        resolved_region = self._resolve_create_region_id(body, timeout_ms=timeout_ms, retry=retry)
-        body["region"] = resolved_region
 
         result = cast(
             CreateSandboxResult,
@@ -111,8 +109,9 @@ class SandboxesResource:
         )
 
         body: CreateSandboxRequest = dict(sandbox_input)
-        body["region"] = resolved_region
         body["volumeId"] = str(volume["id"])
+        if resolved_region and resolved_region != "auto":
+            body["region"] = resolved_region
 
         return self.create(
             body,
@@ -225,6 +224,37 @@ class SandboxesResource:
                 endpoint=f"/sandboxes/{sandbox_id}",
                 method="GET",
                 options=_options(timeout_ms=timeout_ms, retry=retry),
+            ),
+        )
+
+    def wait_data(
+        self,
+        sandbox_id: str,
+        *,
+        timeout_seconds: int | None = None,
+        status: str | None = None,
+        timeout_ms: int | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> Sandbox:
+        """Long-poll until the sandbox reaches a terminal provisioning status."""
+        from ..constants import DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS
+
+        wait_seconds = timeout_seconds if timeout_seconds is not None else DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS
+        query: dict[str, object] = {"timeout": wait_seconds}
+        if status:
+            query["status"] = status
+
+        effective_timeout_ms = timeout_ms
+        if effective_timeout_ms is None:
+            effective_timeout_ms = (wait_seconds + 5) * 1000
+
+        return cast(
+            Sandbox,
+            self._transport.request_json(
+                endpoint=f"/sandboxes/{sandbox_id}/wait",
+                method="GET",
+                query=query,
+                options=_options(timeout_ms=effective_timeout_ms, retry=retry),
             ),
         )
 
@@ -375,14 +405,17 @@ class SandboxesResource:
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
         """Create a Node sandbox with practical defaults."""
+        create_input: CreateSandboxRequest = {
+            "template": "node-22",
+            "persistent": True,
+            "persistentDiskGB": 20,
+            "mountPath": "/workspace",
+        }
+        if region and region != "auto":
+            create_input["region"] = region
+
         sandbox = self.create(
-            {
-                "region": region or "auto",
-                "template": "node-22",
-                "persistent": True,
-                "persistentDiskGB": 20,
-                "mountPath": "/workspace",
-            },
+            create_input,
             timeout_ms=timeout_ms,
             retry=retry,
         )
@@ -401,14 +434,17 @@ class SandboxesResource:
         retry: RetryOptions | bool | None = None,
     ) -> SandboxHandle:
         """Create a Python sandbox with practical defaults."""
+        create_input: CreateSandboxRequest = {
+            "template": "python-3.12",
+            "persistent": True,
+            "persistentDiskGB": 20,
+            "mountPath": "/workspace",
+        }
+        if region and region != "auto":
+            create_input["region"] = region
+
         sandbox = self.create(
-            {
-                "region": region or "auto",
-                "template": "python-3.12",
-                "persistent": True,
-                "persistentDiskGB": 20,
-                "mountPath": "/workspace",
-            },
+            create_input,
             timeout_ms=timeout_ms,
             retry=retry,
         )
@@ -433,29 +469,12 @@ class SandboxesResource:
 
         return str(region_id)
 
-    def _resolve_create_region_id(
-        self,
-        input: CreateSandboxRequest,
-        *,
-        timeout_ms: int | None = None,
-        retry: RetryOptions | bool | None = None,
-    ) -> str:
-        region = input.get("region")
-        if region and region != "auto":
-            return str(region)
-
-        volume_id = input.get("volumeId")
-        if isinstance(volume_id, str) and volume_id != "":
-            volume = self._volumes.get(volume_id, timeout_ms=timeout_ms, retry=retry)
-            region_payload = volume.get("region")
-            if isinstance(region_payload, dict):
-                region_id = region_payload.get("id")
-                if isinstance(region_id, str) and region_id != "":
-                    return region_id
-
-            raise RuntimeError("Unable to infer region from attached volume. Pass `region` explicitly.")
-
-        return self._resolve_region_id(cast(SandboxRegionInput | None, region), timeout_ms=timeout_ms)
+    def _build_create_body(self, input: CreateSandboxRequest) -> CreateSandboxRequest:
+        body: CreateSandboxRequest = dict(input)
+        region = body.get("region")
+        if not region or region == "auto":
+            body.pop("region", None)
+        return body
 
     def _validate_mount_path(self, input: CreateSandboxRequest) -> None:
         mount_path = input.get("mountPath")

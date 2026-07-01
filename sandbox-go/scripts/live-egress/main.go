@@ -91,7 +91,8 @@ func main() {
 		fmt.Printf("wait until ready: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("Sandbox ready.\n")
+	fmt.Println("Sandbox ready.")
+	fmt.Println()
 
 	denied, err := probeHTTP(ctx, handle)
 	if err != nil {

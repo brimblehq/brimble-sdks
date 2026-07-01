@@ -351,6 +351,11 @@ type WaitOptions struct {
 	PollInterval time.Duration
 }
 
+type WaitSandboxQuery struct {
+	TimeoutSeconds int
+	Status         SandboxStatus
+}
+
 type RuntimeOptions struct {
 	WaitUntilReady bool
 	Wait           *WaitOptions

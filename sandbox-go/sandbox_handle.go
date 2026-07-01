@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -98,9 +99,9 @@ func (h *SandboxHandle) UpdateEgress(ctx context.Context, input UpdateSandboxEgr
 	return sandbox, nil
 }
 
-// WaitUntilReady polls until sandbox status is ready using SDK defaults.
+// WaitUntilReady waits until sandbox status is ready using SDK defaults.
 func (h *SandboxHandle) WaitUntilReady(ctx context.Context) (*Sandbox, error) {
-	return h.WaitUntilReadyWithOptions(ctx, DefaultSandboxReadyTimeout, DefaultSandboxReadyPollInterval)
+	return h.WaitUntilReadyWithOptions(ctx, DefaultSandboxReadyTimeout, DefaultSandboxWaitPollInterval)
 }
 
 // WaitUntilReadyWithOptions polls until sandbox status is ready with custom timing.
@@ -109,11 +110,56 @@ func (h *SandboxHandle) WaitUntilReadyWithOptions(ctx context.Context, timeout t
 		timeout = DefaultSandboxReadyTimeout
 	}
 	if pollInterval <= 0 {
-		pollInterval = DefaultSandboxReadyPollInterval
+		pollInterval = DefaultSandboxWaitPollInterval
+	}
+
+	if h.Status() == SandboxStatusReady {
+		return h.Refresh(ctx)
 	}
 
 	deadline := time.Now().Add(timeout)
 
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, fmt.Errorf("sandbox %s did not become ready within %s", h.ID(), timeout)
+		}
+
+		waitSeconds := int(DefaultSandboxLongPollTimeoutSeconds)
+		if remaining < time.Duration(waitSeconds)*time.Second {
+			waitSeconds = int(remaining / time.Second)
+			if waitSeconds < 1 {
+				waitSeconds = 1
+			}
+		}
+
+		sandbox, err := h.sandboxes.WaitData(ctx, h.ID(), WaitSandboxQuery{
+			TimeoutSeconds: waitSeconds,
+			Status:         SandboxStatusReady,
+		})
+		if err != nil {
+			var notFound *NotFoundError
+			if errors.As(err, &notFound) {
+				return h.pollUntilReady(ctx, deadline, pollInterval)
+			}
+			return nil, err
+		}
+
+		h.latest = sandbox
+		if sandbox.Status == SandboxStatusReady {
+			return sandbox, nil
+		}
+		if sandbox.Status == SandboxStatusFailed {
+			return nil, fmt.Errorf("sandbox %s failed to provision", h.ID())
+		}
+	}
+}
+
+func (h *SandboxHandle) pollUntilReady(ctx context.Context, deadline time.Time, pollInterval time.Duration) (*Sandbox, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -126,9 +172,12 @@ func (h *SandboxHandle) WaitUntilReadyWithOptions(ctx context.Context, timeout t
 		if sandbox.Status == SandboxStatusReady {
 			return sandbox, nil
 		}
+		if sandbox.Status == SandboxStatusFailed {
+			return nil, fmt.Errorf("sandbox %s failed to provision", h.ID())
+		}
 
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("sandbox %s did not become ready within %s", h.ID(), timeout)
+			return nil, fmt.Errorf("sandbox %s did not become ready before deadline", h.ID())
 		}
 
 		select {

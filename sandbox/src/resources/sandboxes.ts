@@ -44,16 +44,12 @@ export class SandboxesResource {
 
   /**
    * Create a new sandbox.
-   * Region is optional; when omitted this SDK picks the first available region.
-   * The sandbox starts asynchronously, so fetch it until `status` is `ready`
-   * before running commands or file operations.
+   * Region is optional; when omitted the API assigns an enabled sandbox region.
+   * Pass a region slug (e.g. `eu-west`) or id to pin placement.
+   * The sandbox starts asynchronously — use `waitUntilReady()` before runtime operations.
    */
   public async create(input: CreateSandboxRequest, options?: RequestOptions): Promise<SandboxHandle> {
-    const region = await this.resolveCreateRegionId(input, options);
-    const body: CreateSandboxRequest = {
-      ...input,
-      region,
-    };
+    const body = this.buildCreateBody(input);
     this.applyMountPathDefault(body);
     this.validateMountPath(body);
 
@@ -153,6 +149,32 @@ export class SandboxesResource {
     return this.transport.requestJson<Sandbox>({
       endpoint: `/sandboxes/${sandboxId}`,
       method: 'GET',
+      ...options,
+    }) as Promise<Sandbox>;
+  }
+
+  /**
+   * Long-poll until the sandbox reaches a terminal provisioning status.
+   * Falls back to the caller when the API does not support long-poll (404).
+   */
+  public async waitData(
+    sandboxId: string,
+    query: { timeoutSeconds?: number; status?: string } = {},
+    options?: RequestOptions,
+  ): Promise<Sandbox> {
+    const params = new URLSearchParams();
+    if (query.timeoutSeconds !== undefined) {
+      params.set('timeout', String(query.timeoutSeconds));
+    }
+    if (query.status) {
+      params.set('status', query.status);
+    }
+
+    return this.transport.requestJson<Sandbox>({
+      endpoint: `/sandboxes/${sandboxId}/wait`,
+      method: 'GET',
+      query: params,
+      timeoutMs: ((query.timeoutSeconds ?? 60) + 5) * 1000,
       ...options,
     }) as Promise<Sandbox>;
   }
@@ -315,22 +337,14 @@ export class SandboxesResource {
     return regionId;
   }
 
-  private async resolveCreateRegionId(input: CreateSandboxRequest, options?: RequestOptions): Promise<string> {
-    if (input.region && input.region !== 'auto') {
-      return input.region;
+  private buildCreateBody(input: CreateSandboxRequest): CreateSandboxRequest {
+    const body: CreateSandboxRequest = { ...input };
+
+    if (!body.region || body.region === 'auto') {
+      delete body.region;
     }
 
-    if (typeof input.volumeId === 'string' && input.volumeId.length > 0) {
-      const volume = await this.volumes.get(input.volumeId, options);
-      const region = volume.region;
-      if (region && typeof region === 'object' && typeof region.id === 'string' && region.id.length > 0) {
-        return region.id;
-      }
-
-      throw new Error('Unable to infer region from attached volume. Pass `region` explicitly.');
-    }
-
-    return this.resolveRegionId(undefined, options);
+    return body;
   }
 
   private validateMountPath(input: CreateSandboxRequest): void {

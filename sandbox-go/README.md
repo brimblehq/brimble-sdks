@@ -125,7 +125,7 @@ client.Sandboxes.Create(ctx, CreateSandboxRequest{
 
 Modes: `open`, `restricted` (allowlist required), `deny_all`.
 
-If `Region` is empty, the SDK resolves the first available sandbox region automatically.
+If `Region` is empty or `auto`, it is omitted from the create request and the API assigns an enabled sandbox region. Pass a slug (e.g. `eu-west`) or region id to pin placement. `ListRegions` remains available for discovery and `WithVolume` workflows.
 
 ## Errors
 

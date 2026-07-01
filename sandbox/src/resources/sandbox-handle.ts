@@ -1,8 +1,10 @@
 import {
-  DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS,
+  DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS,
   DEFAULT_SANDBOX_READY_TIMEOUT_MS,
+  DEFAULT_SANDBOX_WAIT_POLL_INTERVAL_MS,
 } from '../constants';
 import { SandboxStatus } from '../enums';
+import { NotFoundError } from '../errors';
 import type { RequestOptions } from '../transport/http';
 import type {
   AckMessage,
@@ -107,13 +109,56 @@ export class SandboxHandle {
   }
 
   /**
-   * Poll sandbox status until it becomes `ready`.
-   * Throws on timeout or when `signal` is aborted.
+   * Wait until the sandbox becomes `ready`.
+   * Uses server long-poll when available; falls back to fast polling on 404.
    */
   public async waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<Sandbox> {
+    if (this.status === SandboxStatus.Ready) {
+      return this.refresh({ signal: options.signal });
+    }
+
     const timeoutMs = options.timeoutMs ?? DEFAULT_SANDBOX_READY_TIMEOUT_MS;
-    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS;
     const deadline = Date.now() + timeoutMs;
+
+    while (true) {
+      if (options.signal?.aborted) {
+        throw new Error('waitUntilReady aborted by signal');
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        throw new Error(`Sandbox ${this.id} did not become ready within ${timeoutMs}ms`);
+      }
+
+      const waitSeconds = Math.min(
+        DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS,
+        Math.max(1, Math.ceil(remainingMs / 1000)),
+      );
+
+      try {
+        const sandbox = await this.sandboxes.waitData(
+          this.id,
+          { timeoutSeconds: waitSeconds, status: SandboxStatus.Ready },
+          { signal: options.signal },
+        );
+        this.sandboxState = sandbox;
+        if (sandbox.status === SandboxStatus.Ready) {
+          return sandbox;
+        }
+        if (sandbox.status === SandboxStatus.Failed) {
+          throw new Error(`Sandbox ${this.id} failed to provision`);
+        }
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return this.pollUntilReady(options, deadline);
+        }
+        throw error;
+      }
+    }
+  }
+
+  private async pollUntilReady(options: WaitUntilReadyOptions, deadline: number): Promise<Sandbox> {
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_SANDBOX_WAIT_POLL_INTERVAL_MS;
 
     while (true) {
       if (options.signal?.aborted) {
@@ -124,8 +169,12 @@ export class SandboxHandle {
       if (sandbox.status === SandboxStatus.Ready) {
         return sandbox;
       }
+      if (sandbox.status === SandboxStatus.Failed) {
+        throw new Error(`Sandbox ${this.id} failed to provision`);
+      }
 
       if (Date.now() >= deadline) {
+        const timeoutMs = options.timeoutMs ?? DEFAULT_SANDBOX_READY_TIMEOUT_MS;
         throw new Error(`Sandbox ${this.id} did not become ready within ${timeoutMs}ms`);
       }
 

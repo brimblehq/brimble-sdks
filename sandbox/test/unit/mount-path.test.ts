@@ -209,9 +209,9 @@ describe('Sandbox mountPath support', () => {
     });
 
     expect(requestBody).toMatchObject({
-      region: 'region-from-volume',
       volumeId: 'volume-123',
       mountPath: '/workspace',
     });
+    expect(requestBody).not.toHaveProperty('region');
   });
 });

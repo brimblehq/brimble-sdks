@@ -8,8 +8,13 @@ from typing import TYPE_CHECKING, cast
 
 from ..streaming import ByteStream, ExecStream
 
-from ..constants import DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS, DEFAULT_SANDBOX_READY_TIMEOUT_MS
+from ..constants import (
+    DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS,
+    DEFAULT_SANDBOX_READY_TIMEOUT_MS,
+    DEFAULT_SANDBOX_WAIT_POLL_INTERVAL_MS,
+)
 from ..enums import SandboxStatus
+from ..errors import NotFoundError
 from ..transport import RetryOptions
 from ..types import (
     BatchFileUploadFileInput,
@@ -122,25 +127,56 @@ class SandboxHandle:
         self,
         *,
         timeout_ms: int | None = DEFAULT_SANDBOX_READY_TIMEOUT_MS,
-        poll_interval_ms: int | None = DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS,
+        poll_interval_ms: int | None = DEFAULT_SANDBOX_WAIT_POLL_INTERVAL_MS,
     ) -> dict[str, object]:
-        """Poll until sandbox status becomes `ready`, or raise on timeout."""
+        """Wait until sandbox status becomes `ready`, using server long-poll when available."""
         effective_timeout_ms = timeout_ms if timeout_ms is not None else DEFAULT_SANDBOX_READY_TIMEOUT_MS
         effective_poll_interval_ms = (
-            poll_interval_ms if poll_interval_ms is not None else DEFAULT_SANDBOX_READY_POLL_INTERVAL_MS
+            poll_interval_ms if poll_interval_ms is not None else DEFAULT_SANDBOX_WAIT_POLL_INTERVAL_MS
         )
+
+        if self.status == SandboxStatus.READY:
+            return self.refresh(timeout_ms=effective_timeout_ms)
 
         deadline = time.monotonic() + (effective_timeout_ms / 1000)
 
         while True:
-            sandbox = self.refresh(timeout_ms=effective_timeout_ms)
-            if sandbox.get("status") == SandboxStatus.READY:
-                return sandbox
-
-            if time.monotonic() >= deadline:
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
                 raise TimeoutError(f"Sandbox {self.id} did not become ready within {effective_timeout_ms}ms")
 
-            time.sleep(max(effective_poll_interval_ms, 1) / 1000)
+            wait_seconds = min(
+                DEFAULT_SANDBOX_LONG_POLL_TIMEOUT_SECONDS,
+                max(1, (remaining_ms + 999) // 1000),
+            )
+
+            try:
+                sandbox = self._sandboxes.wait_data(
+                    self.id,
+                    timeout_seconds=wait_seconds,
+                    status=SandboxStatus.READY,
+                    timeout_ms=(wait_seconds + 5) * 1000,
+                )
+                self._state = dict(sandbox)
+                if sandbox.get("status") == SandboxStatus.READY:
+                    return self._state
+                if sandbox.get("status") == SandboxStatus.FAILED:
+                    raise RuntimeError(f"Sandbox {self.id} failed to provision")
+            except NotFoundError:
+                return self._poll_until_ready(deadline, effective_poll_interval_ms)
+
+    def _poll_until_ready(self, deadline: float, poll_interval_ms: int) -> dict[str, object]:
+        while True:
+            sandbox = self.refresh()
+            if sandbox.get("status") == SandboxStatus.READY:
+                return sandbox
+            if sandbox.get("status") == SandboxStatus.FAILED:
+                raise RuntimeError(f"Sandbox {self.id} failed to provision")
+
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Sandbox {self.id} did not become ready before deadline")
+
+            time.sleep(max(poll_interval_ms, 1) / 1000)
 
     def exec(
         self,

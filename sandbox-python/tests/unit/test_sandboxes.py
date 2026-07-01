@@ -161,36 +161,13 @@ def test_mount_path_rejects_invalid_pattern() -> None:
         )
 
 
-def test_create_infers_region_from_attached_volume_when_omitted() -> None:
+def test_create_omits_region_when_attaching_volume_without_explicit_region() -> None:
     client = Sandbox(api_key="test-key")
     captured: dict[str, object] = {}
 
     def fake_request_json(**kwargs: Any) -> object:
         endpoint = kwargs.get("endpoint")
         method = kwargs.get("method")
-
-        if endpoint == "/volumes/volume-123" and method == "GET":
-            return {
-                "id": "volume-123",
-                "name": "cache",
-                "type": "sandbox",
-                "team": None,
-                "csi_volume_id": None,
-                "size": 20,
-                "region": {
-                    "id": "region-from-volume",
-                    "name": "Test",
-                    "country": "US",
-                    "continent": "NA",
-                    "provider": "test",
-                    "is_paid": False,
-                },
-                "attached_sandbox_id": None,
-                "attached_project_id": None,
-                "last_attached_at": None,
-                "created_at": None,
-                "updated_at": None,
-            }
 
         if endpoint == "/sandboxes" and method == "POST":
             nonlocal captured
@@ -217,7 +194,7 @@ def test_create_infers_region_from_attached_volume_when_omitted() -> None:
 
     body = captured["body"]
     assert isinstance(body, dict)
-    assert body["region"] == "region-from-volume"
+    assert "region" not in body
     assert body["volumeId"] == "volume-123"
     assert body["mountPath"] == "/workspace"
 

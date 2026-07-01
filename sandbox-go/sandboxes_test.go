@@ -237,12 +237,6 @@ func TestCreateInfersRegionFromAttachedVolumeWhenOmitted(t *testing.T) {
 	var seen map[string]any
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/volumes/volume-123" {
-			w.Header().Set("content-type", "application/json")
-			_, _ = w.Write([]byte(`{"message":"Volume fetched","data":{"id":"volume-123","name":"cache","type":"sandbox","team":null,"csi_volume_id":null,"size":20,"region":{"id":"region-from-volume","name":"Test","country":"US","continent":"NA","provider":"test","is_paid":false},"attached_sandbox_id":null,"attached_project_id":null,"last_attached_at":null,"created_at":null,"updated_at":null}}`))
-			return
-		}
-
 		if r.Method == http.MethodPost && r.URL.Path == "/sandboxes" {
 			defer r.Body.Close()
 			if err := json.NewDecoder(r.Body).Decode(&seen); err != nil {
@@ -274,8 +268,11 @@ func TestCreateInfersRegionFromAttachedVolumeWhenOmitted(t *testing.T) {
 		t.Fatalf("create sandbox: %v", err)
 	}
 
-	if seen["region"] != "region-from-volume" {
-		t.Fatalf("expected region-from-volume, got %#v", seen["region"])
+	if _, ok := seen["region"]; ok {
+		t.Fatalf("expected region to be omitted from create body, got %#v", seen["region"])
+	}
+	if seen["volumeId"] != "volume-123" {
+		t.Fatalf("expected volumeId volume-123, got %#v", seen["volumeId"])
 	}
 	if seen["mountPath"] != "/workspace" {
 		t.Fatalf("expected default mountPath /workspace, got %#v", seen["mountPath"])

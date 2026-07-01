@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var mountPathPattern = regexp.MustCompile(`^/[A-Za-z0-9._/-]*$`)
@@ -16,7 +17,8 @@ type SandboxesResource struct {
 }
 
 // Create creates a sandbox and returns a handle for direct runtime operations.
-// Region is optional; empty or "auto" resolves the first available region.
+// Region is optional; when omitted the API assigns an enabled sandbox region.
+// Pass a region slug (e.g. eu-west) or id to pin placement.
 func (r *SandboxesResource) Create(ctx context.Context, input CreateSandboxRequest, options ...RequestOptions) (*SandboxHandle, error) {
 	requestOptions := firstOptions(options...)
 	applyMountPathDefault(&input)
@@ -24,14 +26,10 @@ func (r *SandboxesResource) Create(ctx context.Context, input CreateSandboxReque
 		return nil, err
 	}
 
-	resolvedRegion, err := r.resolveCreateRegionID(ctx, input, requestOptions)
-	if err != nil {
-		return nil, err
-	}
-	input.Region = resolvedRegion
+	body := buildCreateBody(input)
 
 	var out CreateSandboxResult
-	_, err = r.client.doJSONWithOptions(ctx, http.MethodPost, "/sandboxes", nil, input, &out, requestOptions)
+	_, err := r.client.doJSONWithOptions(ctx, http.MethodPost, "/sandboxes", nil, body, &out, requestOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +222,38 @@ func (r *SandboxesResource) GetData(ctx context.Context, sandboxID string, optio
 	return &out, nil
 }
 
+// WaitData long-polls until the sandbox reaches a terminal provisioning status.
+func (r *SandboxesResource) WaitData(ctx context.Context, sandboxID string, query WaitSandboxQuery, options ...RequestOptions) (*Sandbox, error) {
+	timeoutSeconds := query.TimeoutSeconds
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = DefaultSandboxLongPollTimeoutSeconds
+	}
+
+	params := map[string]string{
+		"timeout": strconv.Itoa(timeoutSeconds),
+	}
+	if query.Status != "" {
+		params["status"] = string(query.Status)
+	}
+
+	requestOptions := firstOptions(options...)
+	if requestOptions == nil {
+		requestOptions = &RequestOptions{}
+	}
+	if requestOptions.Timeout <= 0 {
+		copy := *requestOptions
+		copy.Timeout = time.Duration(timeoutSeconds+5) * time.Second
+		requestOptions = &copy
+	}
+
+	var out Sandbox
+	_, err := r.client.doJSONWithOptions(ctx, http.MethodGet, "/sandboxes/"+sandboxID+"/wait", params, nil, &out, requestOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ListRegions lists regions where sandboxes can be provisioned.
 func (r *SandboxesResource) ListRegions(ctx context.Context, options ...RequestOptions) (*SandboxRegionsResult, error) {
 	var out SandboxRegionsResult
@@ -369,24 +399,12 @@ func (r *SandboxesResource) resolveRegionID(ctx context.Context, region string, 
 	return regions.Regions[0].ID, nil
 }
 
-func (r *SandboxesResource) resolveCreateRegionID(ctx context.Context, input CreateSandboxRequest, requestOptions *RequestOptions) (string, error) {
-	if input.Region != "" && input.Region != "auto" {
-		return input.Region, nil
+func buildCreateBody(input CreateSandboxRequest) CreateSandboxRequest {
+	body := input
+	if body.Region == "" || body.Region == "auto" {
+		body.Region = ""
 	}
-
-	if input.VolumeID != "" {
-		volume, err := r.client.Volumes.Get(ctx, input.VolumeID, derefOptions(requestOptions)...)
-		if err != nil {
-			return "", err
-		}
-		if volume.Region != nil && volume.Region.ID != "" {
-			return volume.Region.ID, nil
-		}
-
-		return "", fmt.Errorf("unable to infer region from attached volume; pass `region` explicitly")
-	}
-
-	return r.resolveRegionID(ctx, "", requestOptions)
+	return body
 }
 
 func validateMountPath(input CreateSandboxRequest) error {

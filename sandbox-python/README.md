@@ -137,4 +137,4 @@ sandbox = client.sandboxes.create(
 )
 ```
 
-If `region` is omitted, the SDK resolves the first available sandbox region automatically.
+If `region` is omitted or `auto`, it is omitted from the create request and the API assigns an enabled sandbox region. Pass a slug (e.g. `eu-west`) or region id to pin placement.
