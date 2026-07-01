@@ -5,7 +5,7 @@ import "time"
 const (
 	DefaultBaseURL       = "https://sandbox.brimble.io"
 	SandboxAPIKeyEnvName = "BRIMBLE_SANDBOX_KEY"
-	SDKPackageVersion    = "0.1.0"
+	SDKPackageVersion    = "0.1.4"
 	DefaultPage          = 1
 	DefaultPageLimit     = 15
 	MaxPageLimit         = 100
@@ -13,9 +13,11 @@ const (
 )
 
 const (
-	DefaultTimeout                  = 30 * time.Second
-	DefaultSandboxReadyTimeout      = 60 * time.Second
-	DefaultSandboxReadyPollInterval = 500 * time.Millisecond
+	DefaultTimeout                       = 30 * time.Second
+	DefaultSandboxReadyTimeout           = 60 * time.Second
+	DefaultSandboxReadyPollInterval      = 500 * time.Millisecond
+	DefaultSandboxWaitPollInterval       = 100 * time.Millisecond
+	DefaultSandboxLongPollTimeoutSeconds = 60
 )
 
 const (
