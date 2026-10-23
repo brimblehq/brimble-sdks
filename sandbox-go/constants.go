@@ -5,7 +5,7 @@ import "time"
 const (
 	DefaultBaseURL       = "https://sandbox.brimble.io"
 	SandboxAPIKeyEnvName = "BRIMBLE_SANDBOX_KEY"
-	SDKPackageVersion    = "0.1.5"
+	SDKPackageVersion    = "0.1.6"
 	DefaultPage          = 1
 	DefaultPageLimit     = 15
 	MaxPageLimit         = 100
