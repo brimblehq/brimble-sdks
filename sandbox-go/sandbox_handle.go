@@ -89,6 +89,11 @@ func (h *SandboxHandle) Resume(ctx context.Context, options ...RequestOptions) (
 	return ack, nil
 }
 
+// GetPreviewURL returns the public URL that serves the given port; it works while the sandbox runs and the port is listening.
+func (h *SandboxHandle) GetPreviewURL(ctx context.Context, port int, options ...RequestOptions) (*SandboxPreview, error) {
+	return h.sandboxes.GetPreviewURL(ctx, h.ID(), port, options...)
+}
+
 // UpdateEgress updates outbound network policy for this sandbox.
 func (h *SandboxHandle) UpdateEgress(ctx context.Context, input UpdateSandboxEgressInput, options ...RequestOptions) (*Sandbox, error) {
 	sandbox, err := h.sandboxes.UpdateEgress(ctx, h.ID(), input, options...)

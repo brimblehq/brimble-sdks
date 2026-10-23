@@ -327,3 +327,34 @@ func TestUpdateEgressSendsPutWithModeAndAllow(t *testing.T) {
 		t.Fatalf("expected network_updated=true, got %#v", result.NetworkUpdated)
 	}
 }
+
+func TestGetPreviewURLRequestsPortPreview(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/sandboxes/sandbox-123/ports/5173/preview-url" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"Sandbox preview URL fetched","data":{"port":5173,"url":"https://0abc.brimble.run"}}`))
+	}))
+	defer ts.Close()
+
+	client, err := NewClient(ClientConfig{
+		APIKey:  "test-key",
+		BaseURL: ts.URL,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	preview, err := client.Sandboxes.Use("sandbox-123").GetPreviewURL(context.Background(), 5173)
+	if err != nil {
+		t.Fatalf("get preview url: %v", err)
+	}
+
+	if preview.Port != 5173 || preview.URL != "https://0abc.brimble.run" {
+		t.Fatalf("unexpected preview: %#v", preview)
+	}
+}

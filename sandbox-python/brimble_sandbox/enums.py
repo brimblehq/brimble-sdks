@@ -36,6 +36,12 @@ class SandboxStatus(StrEnum):
     DESTROYED = "destroyed"
 
 
+class SandboxSize(StrEnum):
+    MICRO = "sbx.micro"
+    SMALL = "sbx.small"
+    MEDIUM = "sbx.medium"
+
+
 class SnapshotMode(StrEnum):
     MANUAL = "manual"
     AUTOMATIC = "automatic"

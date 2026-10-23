@@ -11,6 +11,7 @@ import type {
   CreateVolumeInput,
   Paginated,
   Sandbox,
+  SandboxPreview,
   SandboxReadyRequestOptions,
   SandboxRegionInput,
   SandboxRegionsResult,
@@ -43,9 +44,10 @@ export class SandboxesResource {
   }
 
   /**
-   * Create a new sandbox and wait until it is ready (~2–3s).
+   * Create a new sandbox and wait until it is ready.
+   * Pass optional `size` (`sbx.micro` | `sbx.small` | `sbx.medium`); plan default when omitted.
+   * Warm pool create is typically ~0.5–1s. Empty pool fails with capacity exhausted.
    * Region is optional; when omitted the API assigns an enabled sandbox region.
-   * Pass a region slug (e.g. `eu-west`) or id to pin placement.
    * Returns a handle with `status: ready` — no polling required before exec.
    */
   public async create(input: CreateSandboxRequest, options?: RequestOptions): Promise<SandboxHandle> {
@@ -277,6 +279,15 @@ export class SandboxesResource {
       body: input,
       ...options,
     }) as Promise<Sandbox>;
+  }
+
+  /** Get the public URL that serves the given port inside a sandbox. */
+  public getPreviewUrl(sandboxId: string, port: number, options?: RequestOptions): Promise<SandboxPreview> {
+    return this.transport.requestJson<SandboxPreview>({
+      endpoint: `/sandboxes/${sandboxId}/ports/${port}/preview-url`,
+      method: 'GET',
+      ...options,
+    }) as Promise<SandboxPreview>;
   }
 
   /** Use runtime operations for a specific sandbox id. */

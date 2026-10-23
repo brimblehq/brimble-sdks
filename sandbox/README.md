@@ -24,16 +24,16 @@ BRIMBLE_SANDBOX_KEY=your_key_here npm run test:all
 ## Quickstart
 
 ```ts
-import { CodeLanguage, Sandbox } from '@brimble/sandbox';
+import { CodeLanguage, Sandbox, SandboxSize } from '@brimble/sandbox';
 
 const client = new Sandbox();
 
 const sandbox = await client.sandboxes.create({
   template: 'node-22',
-  persistent: true,
-  persistentDiskGB: 20,
-  mountPath: '/workspace',
+  size: SandboxSize.Micro,
 });
+
+console.log(sandbox.size);
 
 await sandbox.exec({ cmd: 'node -v', env: { NODE_ENV: 'production' } });
 
@@ -50,7 +50,6 @@ await sandbox.runCode({
   env: { FEATURE_FLAG: 'on' },
 });
 
-// Handle-first lifecycle on existing sandboxes.
 const existingSandbox = await client.sandboxes.get(sandbox.id);
 await existingSandbox.destroy();
 ```
@@ -58,54 +57,73 @@ await existingSandbox.destroy();
 Set `BRIMBLE_SANDBOX_KEY` in your environment.  
 If needed, pass `apiKey` explicitly in the constructor; explicit value wins over env.
 
+### Size
+
+Pass a named size. Freeform `specs` are not accepted by the API.
+
+| Size | Constant |
+|------|----------|
+| `sbx.micro` | `SandboxSize.Micro` |
+| `sbx.small` | `SandboxSize.Small` |
+| `sbx.medium` | `SandboxSize.Medium` |
+
+If `size` is omitted, the API uses the plan default. Allowed sizes are plan-gated.
+
+### Create latency
+
+`create()` is a blocking POST that returns a **ready** sandbox. With a warm pool seed, this is typically **~0.5–1s**. When the pool is empty, create fails with capacity exhausted (no silent cold boot).
+
+### Current create constraints
+
+Warm capacity path only supports:
+
+- open egress
+- non-persistent (no volume / CSI attach at create)
+- no snapshot restore (`fromSnapshot`)
+- no one-shot
+
+Methods like `withVolume`, restricted egress, and `blockOutbound` remain on the client for later product paths; the live API rejects those create shapes today.
+
 ## Ergonomic helpers
 
 ```ts
-// 1) Create returns a ready sandbox (~2-3s blocking POST)
-const created = await client.sandboxes.create({ template: 'node-22' });
+import { Sandbox, SandboxSize } from '@brimble/sandbox';
 
-// createReady() is an alias of create() (deprecated)
-const alsoReady = await client.sandboxes.createReady({ template: 'node-22' });
+const client = new Sandbox();
 
-// 2) Get + wait in one call (for resume/reconnect)
-const loaded = await client.sandboxes.getReady(created.id);
-
-// 3) Create a volume + attach in one call (region resolved for volume only)
-const withVolume = await client.sandboxes.withVolume({
-  sandbox: { template: 'node-22', mountPath: '/var/www/html' },
-  volume: { name: 'workspace-disk', sizeGB: 20 },
+const created = await client.sandboxes.create({
+  template: 'node-22',
+  size: SandboxSize.Small,
 });
 
-// 4) Auto-wait at runtime call sites
-await withVolume.exec({ cmd: 'npm -v' }, { waitUntilReady: true });
+const alsoReady = await client.sandboxes.createReady({ template: 'node-22' });
 
-// Streaming command output (Vercel/Railway-style async iteration)
-const output = await withVolume.exec({ cmd: 'for i in 1 2 3; do echo $i; done', stream: true });
+const loaded = await client.sandboxes.getReady(created.id);
+
+await created.exec({ cmd: 'npm -v' }, { waitUntilReady: true });
+
+const output = await created.exec({ cmd: 'for i in 1 2 3; do echo $i; done', stream: true });
 for await (const log of output) {
   if (log.stream === 'stdout') process.stdout.write(log.data);
 }
 const streamedResult = await output.result();
 
-// Or stream with callbacks and still get the final ExecResult
-const buffered = await withVolume.exec({
+const buffered = await created.exec({
   cmd: 'npm install',
   onStdout: (chunk) => process.stdout.write(chunk),
 });
 
-// File downloads
-const file = await withVolume.getFile('tmp/notes.txt');
+const file = await created.getFile('tmp/notes.txt');
 for await (const chunk of file) {
   process.stdout.write(chunk);
 }
 
-// 5) List templates/regions
 const templates = await client.sandboxes.listTemplates();
 const nodeTemplate = await client.sandboxes.getTemplate('node-22');
 const { regions } = await client.sandboxes.listRegions();
 
-// 6) Async iterators for pagination
 for await (const sandbox of client.sandboxes.iterate({ teamId: '<team>' })) {
-  console.log(sandbox.id, sandbox.status);
+  console.log(sandbox.id, sandbox.status, sandbox.size);
 }
 ```
 
@@ -117,38 +135,24 @@ const sandbox = await client.sandboxes.get('<sandbox-id>');
 await sandbox.snapshots.create({ name: 'before-migration' });
 ```
 
-Volume attachment is create-time only.  
-Use `client.sandboxes.create({ ..., volumeId })` or `client.sandboxes.withVolume(...)`.
-
 ## Network egress
 
-Control outbound network access when creating or updating a sandbox.
+Default create uses **open** egress (required for warm pool).
 
 ```ts
 import { Sandbox, SandboxEgressMode } from '@brimble/sandbox';
 
 const client = new Sandbox();
+const sandbox = await client.sandboxes.create({ template: 'node-22' });
 
-// Create with restricted egress (allowlist)
-const sandbox = await client.sandboxes.createReady({
-  template: 'node-22',
-  egress: {
-    mode: SandboxEgressMode.Restricted,
-    allow: ['1.1.1.1', 'api.example.com'],
-  },
-});
-
-// Update egress at runtime
 const updated = await sandbox.updateEgress({
   mode: SandboxEgressMode.DenyAll,
 });
-console.log(updated.network_updated); // true when Nomad network mode changed
-
-// Legacy shorthand (maps to deny_all)
-await client.sandboxes.create({ template: 'node-22', blockOutbound: true });
+console.log(updated.network_updated);
 ```
 
-Modes: `open` (full internet), `restricted` (allowlist required), `deny_all` (no outbound).
+Modes: `open`, `restricted` (allowlist required), `deny_all`.  
+Restricted / deny-all **at create** is rejected by the warm-pool API; update after create if the product path allows it.
 
 ## Retry, timeouts, and idempotency
 
@@ -163,12 +167,12 @@ const client = new Sandbox({
 });
 
 await client.sandboxes.create(
-  { template: 'node-22' },
+  { template: 'node-22', size: 'sbx.micro' },
   { idempotencyKey: 'create-sandbox-123' },
 );
 ```
 
-If `region` is omitted, the SDK resolves the first available sandbox region automatically.
+If `region` is omitted or `auto`, the API assigns an enabled sandbox region. Pass a slug (e.g. `eu-west`) or region id to pin placement.
 
 ## Resources
 

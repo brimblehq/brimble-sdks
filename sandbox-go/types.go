@@ -134,24 +134,24 @@ type SandboxSpecs struct {
 }
 
 type CreateSandboxRequest struct {
-	Name              string         `json:"name,omitempty"`
-	Template          string         `json:"template,omitempty"`
-	TeamID            string         `json:"teamId,omitempty"`
-	EnvironmentID     string         `json:"environmentId,omitempty"`
-	Region            string         `json:"region,omitempty"`
-	Specs             *SandboxSpecs  `json:"specs,omitempty"`
-	AutoDestroy       *bool          `json:"autoDestroy,omitempty"`
-	DestroyTimeout    DestroyTimeout `json:"destroyTimeout,omitempty"`
+	Name              string               `json:"name,omitempty"`
+	Template          string               `json:"template,omitempty"`
+	TeamID            string               `json:"teamId,omitempty"`
+	EnvironmentID     string               `json:"environmentId,omitempty"`
+	Region            string               `json:"region,omitempty"`
+	Size              string               `json:"size,omitempty"`
+	AutoDestroy       *bool                `json:"autoDestroy,omitempty"`
+	DestroyTimeout    DestroyTimeout       `json:"destroyTimeout,omitempty"`
 	OneShot           *bool                `json:"oneShot,omitempty"`
 	BlockOutbound     *bool                `json:"blockOutbound,omitempty"`
 	Egress            *SandboxEgressConfig `json:"egress,omitempty"`
 	Persistent        *bool                `json:"persistent,omitempty"`
-	PersistentDiskGB  *int           `json:"persistentDiskGB,omitempty"`
-	VolumeID          string         `json:"volumeId,omitempty"`
-	MountPath         string         `json:"mountPath,omitempty"`
-	FromSnapshot      string         `json:"fromSnapshot,omitempty"`
-	SnapshotMode      SnapshotMode   `json:"snapshotMode,omitempty"`
-	SnapshotFrequency string         `json:"snapshotFrequency,omitempty"`
+	PersistentDiskGB  *int                 `json:"persistentDiskGB,omitempty"`
+	VolumeID          string               `json:"volumeId,omitempty"`
+	MountPath         string               `json:"mountPath,omitempty"`
+	FromSnapshot      string               `json:"fromSnapshot,omitempty"`
+	SnapshotMode      SnapshotMode         `json:"snapshotMode,omitempty"`
+	SnapshotFrequency string               `json:"snapshotFrequency,omitempty"`
 }
 
 type CreateSandboxInput = CreateSandboxRequest
@@ -165,41 +165,48 @@ type CreateSandboxResult struct {
 	ID        string        `json:"id"`
 	Name      string        `json:"name"`
 	Template  string        `json:"template"`
+	Size      *string       `json:"size"`
 	Status    SandboxStatus `json:"status"`
 	CreatedAt time.Time     `json:"created_at"`
 	ExpiresAt time.Time     `json:"expires_at"`
 }
 
 type Sandbox struct {
-	ID               string          `json:"id"`
-	Name             string          `json:"name"`
-	Template         string          `json:"template"`
-	Status           SandboxStatus   `json:"status"`
-	Region           any             `json:"region"`
-	Specs            SandboxSpecs    `json:"specs"`
-	Team             *string         `json:"team"`
-	ProjectEnv       *string         `json:"project_environment"`
-	AutoDestroy      bool            `json:"auto_destroy"`
-	DestroyTimeout   *DestroyTimeout `json:"destroy_timeout"`
-	OneShot          bool                 `json:"one_shot"`
-	BlockOutbound    bool                 `json:"block_outbound"`
-	Egress           SandboxEgressConfig  `json:"egress"`
-	Persistent       bool                 `json:"persistent"`
-	PersistentDiskGB *int            `json:"persistent_disk_gb"`
-	PausedAt         *time.Time      `json:"paused_at"`
-	FromSnapshot     *string         `json:"from_snapshot"`
-	SnapshotMode     SnapshotMode    `json:"snapshot_mode"`
-	SnapshotFreq     *string         `json:"snapshot_frequency"`
-	CreatedAt        time.Time       `json:"created_at"`
-	LastActivityAt   time.Time       `json:"last_activity_at"`
-	ExpiresAt        time.Time       `json:"expires_at"`
-	DestroyedAt      *time.Time           `json:"destroyed_at"`
-	DestroyReason    *DestroyReason       `json:"destroy_reason"`
-	NetworkUpdated   *bool                `json:"network_updated,omitempty"`
+	ID               string              `json:"id"`
+	Name             string              `json:"name"`
+	Template         string              `json:"template"`
+	Size             *string             `json:"size"`
+	Status           SandboxStatus       `json:"status"`
+	Region           any                 `json:"region"`
+	Specs            SandboxSpecs        `json:"specs"`
+	Team             *string             `json:"team"`
+	ProjectEnv       *string             `json:"project_environment"`
+	AutoDestroy      bool                `json:"auto_destroy"`
+	DestroyTimeout   *DestroyTimeout     `json:"destroy_timeout"`
+	OneShot          bool                `json:"one_shot"`
+	BlockOutbound    bool                `json:"block_outbound"`
+	Egress           SandboxEgressConfig `json:"egress"`
+	Persistent       bool                `json:"persistent"`
+	PersistentDiskGB *int                `json:"persistent_disk_gb"`
+	PausedAt         *time.Time          `json:"paused_at"`
+	FromSnapshot     *string             `json:"from_snapshot"`
+	SnapshotMode     SnapshotMode        `json:"snapshot_mode"`
+	SnapshotFreq     *string             `json:"snapshot_frequency"`
+	CreatedAt        time.Time           `json:"created_at"`
+	LastActivityAt   time.Time           `json:"last_activity_at"`
+	ExpiresAt        time.Time           `json:"expires_at"`
+	DestroyedAt      *time.Time          `json:"destroyed_at"`
+	DestroyReason    *DestroyReason      `json:"destroy_reason"`
+	NetworkUpdated   *bool               `json:"network_updated,omitempty"`
 }
 
 type AckMessage struct {
 	Message string `json:"message"`
+}
+
+type SandboxPreview struct {
+	Port int    `json:"port"`
+	URL  string `json:"url"`
 }
 
 type ExecInput struct {

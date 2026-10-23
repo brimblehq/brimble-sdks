@@ -226,3 +226,21 @@ def test_update_egress_sends_put_with_mode_and_allow() -> None:
     assert body["mode"] == "restricted"
     assert body["allow"] == ["1.1.1.1"]
     assert result["network_updated"] is True
+
+
+def test_get_preview_url_requests_port_preview() -> None:
+    client = Sandbox(api_key="test-key")
+    captured: dict[str, object] = {}
+
+    def fake_request_json(**kwargs: Any) -> object:
+        nonlocal captured
+        captured = kwargs
+        return {"port": 5173, "url": "https://0abc.brimble.run"}
+
+    client.sandboxes._transport.request_json = fake_request_json  # type: ignore[assignment]
+
+    preview = client.sandboxes.use("sandbox-123").get_preview_url(5173)
+
+    assert captured["endpoint"] == "/sandboxes/sandbox-123/ports/5173/preview-url"
+    assert captured["method"] == "GET"
+    assert preview == {"port": 5173, "url": "https://0abc.brimble.run"}

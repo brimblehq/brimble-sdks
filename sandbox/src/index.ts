@@ -28,10 +28,11 @@ export {
   CodeLanguage,
   DestroyReason,
   DestroyTimeout,
+  SandboxEgressMode,
+  SandboxSize,
   SandboxStatus,
   SnapshotMode,
   SnapshotStatus,
-  SandboxEgressMode,
   VolumeType,
 } from './enums';
 
@@ -66,6 +67,7 @@ export type {
   SandboxRegionsResult,
   Sandbox as SandboxData,
   SandboxEgressConfig,
+  SandboxPreview,
   SandboxSpecs,
   Snapshot,
   Stats,

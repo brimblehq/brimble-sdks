@@ -66,6 +66,11 @@ func (s *SandboxScope) Stats(ctx context.Context, query StatsQuery) (*Stats, err
 	return s.StatsAPI.Get(ctx, query)
 }
 
+// GetPreviewURL returns the public URL that serves the given port inside this sandbox.
+func (s *SandboxScope) GetPreviewURL(ctx context.Context, port int, options ...RequestOptions) (*SandboxPreview, error) {
+	return s.client.Sandboxes.GetPreviewURL(ctx, s.sandboxID, port, options...)
+}
+
 // CreateSnapshot creates a snapshot for this sandbox.
 func (s *SandboxScope) CreateSnapshot(ctx context.Context, input CreateSnapshotInput) (*Snapshot, error) {
 	return s.Snapshots.Create(ctx, input)

@@ -1,4 +1,4 @@
-import { DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxStatus, SnapshotMode } from '../enums';
+import { DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxSize, SandboxStatus, SnapshotMode } from '../enums';
 import type { RequestOptions } from '../transport/http';
 import type { RegionSummary } from './region';
 import type { CreateVolumeInput, Volume } from './volume';
@@ -27,7 +27,7 @@ export type CreateSandboxInput = {
   teamId?: string;
   environmentId?: string;
   region?: string;
-  specs?: SandboxSpecs;
+  size?: SandboxSize | string;
   autoDestroy?: boolean;
   destroyTimeout?: DestroyTimeout;
   oneShot?: boolean;
@@ -50,6 +50,7 @@ export type CreateSandboxResult = {
   id: string;
   name: string;
   template: string;
+  size: string | null;
   status: SandboxStatus;
   created_at: string;
   expires_at: string;
@@ -59,6 +60,7 @@ export type Sandbox = {
   id: string;
   name: string;
   template: string;
+  size: string | null;
   status: SandboxStatus;
   region: RegionSummary | string;
   specs: SandboxSpecs;
@@ -85,6 +87,11 @@ export type Sandbox = {
 
 export type AckMessage = {
   message: string;
+};
+
+export type SandboxPreview = {
+  port: number;
+  url: string;
 };
 
 export type WaitUntilReadyOptions = {

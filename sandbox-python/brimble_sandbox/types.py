@@ -76,7 +76,7 @@ class CreateSandboxInput(TypedDict, total=False):
     teamId: str
     environmentId: str
     region: str
-    specs: SandboxSpecs
+    size: str
     autoDestroy: bool
     destroyTimeout: DestroyTimeout
     oneShot: bool
@@ -97,7 +97,7 @@ class CreateSandboxRequest(TypedDict, total=False):
     teamId: str
     environmentId: str
     region: SandboxRegionInput
-    specs: SandboxSpecs
+    size: str
     autoDestroy: bool
     destroyTimeout: DestroyTimeout
     oneShot: bool
@@ -116,6 +116,7 @@ class CreateSandboxResult(TypedDict):
     id: str
     name: str
     template: str
+    size: str | None
     status: SandboxStatus
     created_at: str
     expires_at: str
@@ -125,6 +126,7 @@ class Sandbox(TypedDict):
     id: str
     name: str
     template: str
+    size: str | None
     status: SandboxStatus
     region: RegionSummary | str
     specs: SandboxSpecs
@@ -173,7 +175,7 @@ class CreateSandboxWithVolumeSandboxInput(TypedDict, total=False):
     teamId: str
     environmentId: str
     region: SandboxRegionInput
-    specs: SandboxSpecs
+    size: str
     autoDestroy: bool
     destroyTimeout: DestroyTimeout
     oneShot: bool
@@ -303,6 +305,11 @@ class Stats(TypedDict):
 
 class StatsQuery(TypedDict, total=False):
     hoursAgo: int
+
+
+class SandboxPreview(TypedDict):
+    port: int
+    url: str
 
 
 class BatchFileUploadFileInput(TypedDict):

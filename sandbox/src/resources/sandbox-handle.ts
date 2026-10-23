@@ -19,6 +19,7 @@ import type {
   Paginated,
   Pagination,
   Sandbox,
+  SandboxPreview,
   SandboxRuntimeOptions,
   Snapshot,
   Stats,
@@ -238,6 +239,14 @@ export class SandboxHandle {
   public async stats(query: StatsQuery = {}, options: SandboxRuntimeOptions = {}): Promise<Stats> {
     await this.ensureReady(options.waitUntilReady);
     return this.scope.stats(query, options);
+  }
+
+  /**
+   * Get the public URL that serves the given port inside this sandbox.
+   * The URL works while the sandbox is running and something listens on that port.
+   */
+  public getPreviewUrl(port: number, options?: RequestOptions): Promise<SandboxPreview> {
+    return this.scope.getPreviewUrl(port, options);
   }
 
   /**

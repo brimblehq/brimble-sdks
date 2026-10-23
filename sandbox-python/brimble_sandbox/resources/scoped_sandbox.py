@@ -16,6 +16,7 @@ from ..types import (
     Paginated,
     Pagination,
     SandboxBatchFileUpload,
+    SandboxPreview,
     Snapshot,
     StatsQuery,
 )
@@ -159,6 +160,20 @@ class ScopedSandboxResource:
     ) -> dict[str, object]:
         """Fetch CPU, memory, and network stats for this sandbox."""
         return self.stats_resource.stats(query, timeout_ms=timeout_ms, retry=retry)
+
+    def get_preview_url(
+        self,
+        port: int,
+        *,
+        timeout_ms: int | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> SandboxPreview:
+        """Get the public URL that serves the given port inside this sandbox."""
+        return self._transport.request_json(
+            endpoint=f"/sandboxes/{self._sandbox_id}/ports/{port}/preview-url",
+            method="GET",
+            options=RequestOptions(timeout_ms=timeout_ms, retry=retry),
+        )
 
     def create_snapshot(
         self,

@@ -10,6 +10,10 @@ const (
 	DefaultPageLimit     = 15
 	MaxPageLimit         = 100
 	MinVolumeSizeGB      = 10
+
+	SandboxSizeMicro  = "sbx.micro"
+	SandboxSizeSmall  = "sbx.small"
+	SandboxSizeMedium = "sbx.medium"
 )
 
 const (

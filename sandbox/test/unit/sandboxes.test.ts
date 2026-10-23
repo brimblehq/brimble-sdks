@@ -132,3 +132,32 @@ describe('SandboxesResource egress', () => {
     expect(String(url)).toContain('/sandboxes/sandbox-123/egress');
   });
 });
+
+describe('SandboxesResource preview URLs', () => {
+  test('getPreviewUrl requests the port preview URL', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          message: 'Sandbox preview URL fetched',
+          data: { port: 5173, url: 'https://0abc.brimble.run' },
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
+    ) as typeof fetch;
+
+    const client = new Sandbox({
+      apiKey: 'test-key',
+      fetchImpl,
+    });
+
+    const preview = await client.sandboxes.use('sandbox-123').getPreviewUrl(5173);
+    expect(preview).toEqual({ port: 5173, url: 'https://0abc.brimble.run' });
+
+    const [url, requestInit] = fetchImpl.mock.calls[0] ?? [];
+    expect(requestInit?.method).toBe('GET');
+    expect(String(url)).toContain('/sandboxes/sandbox-123/ports/5173/preview-url');
+  });
+});

@@ -11,6 +11,7 @@ export type {
   CreateSandboxWithVolumeResult,
   Sandbox,
   SandboxEgressConfig,
+  SandboxPreview,
   SandboxReadyRequestOptions,
   SandboxRegionInput,
   SandboxRuntimeOptions,

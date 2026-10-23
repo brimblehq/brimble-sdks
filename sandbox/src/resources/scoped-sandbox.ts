@@ -14,6 +14,7 @@ import type {
   FileUploadBody,
   Paginated,
   Pagination,
+  SandboxPreview,
   Snapshot,
   Stats,
   StatsQuery,
@@ -83,6 +84,15 @@ export class ScopedSandboxResource {
   /** Fetch CPU, memory, and network stats for this sandbox. */
   public stats(query: StatsQuery = {}, options?: RequestOptions): Promise<Stats> {
     return this.statsResource.stats(query, options);
+  }
+
+  /** Get the public URL that serves the given port inside this sandbox. */
+  public getPreviewUrl(port: number, options?: RequestOptions): Promise<SandboxPreview> {
+    return this.transport.requestJson<SandboxPreview>({
+      endpoint: `/sandboxes/${this.sandboxId}/ports/${port}/preview-url`,
+      method: 'GET',
+      ...options,
+    }) as Promise<SandboxPreview>;
   }
 
   /** Create a snapshot for this sandbox. */

@@ -17,7 +17,7 @@ from .constants import (
     MIN_VOLUME_SIZE_GB,
     SANDBOX_API_KEY_ENV_NAME,
 )
-from .enums import CodeLanguage, DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxStatus, SnapshotMode, SnapshotStatus, VolumeType
+from .enums import CodeLanguage, DestroyReason, DestroyTimeout, SandboxEgressMode, SandboxSize, SandboxStatus, SnapshotMode, SnapshotStatus, VolumeType
 from .errors import AuthError, NotFoundError, RateLimitError, SandboxApiError, ValidationError
 from .resources import (
     ExecResource,
@@ -52,6 +52,7 @@ __all__ = [
     "DestroyReason",
     "DestroyTimeout",
     "SandboxEgressMode",
+    "SandboxSize",
     "SandboxStatus",
     "SnapshotMode",
     "SnapshotStatus",

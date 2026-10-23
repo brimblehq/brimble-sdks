@@ -11,18 +11,18 @@ pip install brimble-sandbox
 ## Quickstart
 
 ```python
-from brimble_sandbox import Sandbox
+from brimble_sandbox import Sandbox, SandboxSize
 
 client = Sandbox()  # reads BRIMBLE_SANDBOX_KEY from env
 
 sandbox = client.sandboxes.create(
     {
         "template": "node-22",
-        "persistent": True,
-        "persistentDiskGB": 20,
-        "mountPath": "/workspace",
+        "size": SandboxSize.MICRO,
     }
 )
+
+print(sandbox.size)
 
 result = sandbox.exec({"cmd": "node -v", "env": {"NODE_ENV": "production"}})
 print(result["stdout"])
@@ -38,62 +38,77 @@ existing = client.sandboxes.get(sandbox.id)
 existing.destroy()
 ```
 
+### Size
+
+Pass a named size. Freeform `specs` are not accepted by the API.
+
+| Size | Constant |
+|------|----------|
+| `sbx.micro` | `SandboxSize.MICRO` |
+| `sbx.small` | `SandboxSize.SMALL` |
+| `sbx.medium` | `SandboxSize.MEDIUM` |
+
+If `size` is omitted, the API uses the plan default. Allowed sizes are plan-gated.
+
+### Create latency
+
+`create()` is a blocking POST that returns a **ready** sandbox. With a warm pool seed, this is typically **~0.5–1s**. When the pool is empty, create fails with capacity exhausted (no silent cold boot).
+
+### Current create constraints
+
+Warm capacity path only supports:
+
+- open egress
+- non-persistent (no volume / CSI attach at create)
+- no snapshot restore (`fromSnapshot`)
+- no one-shot
+
+`with_volume`, restricted egress, and `blockOutbound` remain on the client; the live API rejects those create shapes today.
+
 ## Ergonomic helpers
 
 ```python
-# Create returns a ready sandbox (~2-3s blocking POST)
-created = client.sandboxes.create({"template": "node-22"})
+from brimble_sandbox import Sandbox, SandboxSize
 
-# create_ready() is a deprecated alias of create()
-also_ready = client.sandboxes.create_ready({"template": "node-22"})
+client = Sandbox()
 
-# Get + wait in one call (for resume/reconnect)
-loaded = client.sandboxes.get_ready(created.id)
-
-# Create volume + attach at sandbox creation time
-with_volume = client.sandboxes.with_volume(
-    {
-        "sandbox": {"template": "node-22", "mountPath": "/var/www/html"},
-        "volume": {"name": "workspace-disk", "sizeGB": 20},
-    }
+created = client.sandboxes.create(
+    {"template": "node-22", "size": SandboxSize.SMALL}
 )
 
-# Auto-wait on runtime calls
-with_volume.exec({"cmd": "npm -v"}, wait_until_ready=True)
+also_ready = client.sandboxes.create_ready({"template": "node-22"})
 
-# Streaming command output
-output = with_volume.exec_stream({"cmd": "for i in 1 2 3; do echo $i; done"})
+loaded = client.sandboxes.get_ready(created.id)
+
+created.exec({"cmd": "npm -v"}, wait_until_ready=True)
+
+output = created.exec_stream({"cmd": "for i in 1 2 3; do echo $i; done"})
 for log in output:
     if log["stream"] == "stdout":
         print(log["data"], end="")
 result = output.result()
 
-# Or stream with callbacks and still get the final result
-buffered = with_volume.exec(
+buffered = created.exec(
     {"cmd": "npm install"},
     on_stdout=lambda chunk: print(chunk, end=""),
 )
 
-# File downloads
-file_stream = with_volume.get_file("tmp/notes.txt")
+file_stream = created.get_file("tmp/notes.txt")
 for chunk in file_stream:
     print(chunk.decode("utf-8"), end="")
 file_stream.close()
 
-# Templates + regions
 templates = client.sandboxes.list_templates()
 node_template = client.sandboxes.get_template("node-22")
 regions = client.sandboxes.list_regions()
 
-# Iterate through all sandboxes
 for sb in client.sandboxes.iterate({"teamId": "<team>"}):
-    print(sb.id, sb.status)
+    print(sb.id, sb.status, sb.size)
 ```
 
-Volume attachment is create-time only.
-Use `create(..., volumeId=...)` or `with_volume(...)`.
-
 ## Network egress
+
+Default create uses **open** egress (required for warm pool).
 
 ```python
 from brimble_sandbox import Sandbox
@@ -101,22 +116,14 @@ from brimble_sandbox.enums import SandboxEgressMode
 
 client = Sandbox()
 
-sandbox = client.sandboxes.create_ready({
-    "template": "node-22",
-    "egress": {
-        "mode": SandboxEgressMode.RESTRICTED,
-        "allow": ["1.1.1.1", "api.example.com"],
-    },
-})
+sandbox = client.sandboxes.create({"template": "node-22"})
 
 updated = sandbox.update_egress({"mode": SandboxEgressMode.DENY_ALL})
 print(updated.get("network_updated"))
-
-# Legacy shorthand (maps to deny_all)
-client.sandboxes.create({"template": "node-22", "blockOutbound": True})
 ```
 
-Modes: `open`, `restricted` (allowlist required), `deny_all`.
+Modes: `open`, `restricted` (allowlist required), `deny_all`.  
+Restricted / deny-all **at create** is rejected by the warm-pool API; update after create if the product path allows it.
 
 ## Auth
 
@@ -135,7 +142,7 @@ client = Sandbox(
 )
 
 sandbox = client.sandboxes.create(
-    {"template": "node-22"},
+    {"template": "node-22", "size": "sbx.micro"},
     idempotency_key="create-sandbox-123",
 )
 ```

@@ -307,6 +307,16 @@ func (r *SandboxesResource) Resume(ctx context.Context, sandboxID string, option
 	return &out, nil
 }
 
+// GetPreviewURL returns the public URL that serves the given port inside a sandbox.
+func (r *SandboxesResource) GetPreviewURL(ctx context.Context, sandboxID string, port int, options ...RequestOptions) (*SandboxPreview, error) {
+	var out SandboxPreview
+	_, err := r.client.doJSONWithOptions(ctx, http.MethodGet, "/sandboxes/"+sandboxID+"/ports/"+strconv.Itoa(port)+"/preview-url", nil, nil, &out, firstOptions(options...))
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // UpdateEgress updates sandbox outbound network policy.
 func (r *SandboxesResource) UpdateEgress(ctx context.Context, sandboxID string, input UpdateSandboxEgressInput, options ...RequestOptions) (*Sandbox, error) {
 	var out Sandbox

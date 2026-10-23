@@ -23,6 +23,7 @@ from ..types import (
     ExecInput,
     FileUploadBody,
     Pagination,
+    SandboxPreview,
     StatsQuery,
     UpdateSandboxEgressInput,
     WaitPreference,
@@ -290,6 +291,16 @@ class SandboxHandle:
         """Fetch stats for this sandbox; optionally auto-wait for readiness."""
         self._ensure_ready(wait_until_ready)
         return self._scope.stats(query, timeout_ms=timeout_ms, retry=retry)
+
+    def get_preview_url(
+        self,
+        port: int,
+        *,
+        timeout_ms: int | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> SandboxPreview:
+        """Get the public URL that serves the given port; it works while the sandbox runs and the port is listening."""
+        return self._scope.get_preview_url(port, timeout_ms=timeout_ms, retry=retry)
 
     def create_snapshot(
         self,

@@ -15,6 +15,7 @@ from ..types import (
     CreateVolumeInput,
     Paginated,
     Sandbox,
+    SandboxPreview,
     SandboxRegionInput,
     SandboxRegionsResult,
     SandboxTemplate,
@@ -384,6 +385,24 @@ class SandboxesResource:
                 method="PUT",
                 body=input,
                 options=_options(timeout_ms=timeout_ms, idempotency_key=idempotency_key, retry=retry),
+            ),
+        )
+
+    def get_preview_url(
+        self,
+        sandbox_id: str,
+        port: int,
+        *,
+        timeout_ms: int | None = None,
+        retry: RetryOptions | bool | None = None,
+    ) -> SandboxPreview:
+        """Get the public URL that serves the given port inside a sandbox."""
+        return cast(
+            SandboxPreview,
+            self._transport.request_json(
+                endpoint=f"/sandboxes/{sandbox_id}/ports/{port}/preview-url",
+                method="GET",
+                options=_options(timeout_ms=timeout_ms, retry=retry),
             ),
         )
 
