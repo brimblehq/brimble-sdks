@@ -10,73 +10,18 @@ Public SDK repository for Brimble Sandbox.
 
 ## Release
 
-### Go + Python (one command)
+Releases run from GitHub Actions: **Actions → Release → Run workflow**, then pick the package and enter the version (e.g. `0.1.7`, or `0.2.0-rc.1` for a pre-release).
 
-From the repo root:
+| Package | Published to | Tag |
+| --- | --- | --- |
+| `sandbox` | npm (`@brimble/sandbox`, with provenance) | `sandbox/vX.Y.Z` |
+| `sandbox-python` | PyPI (`brimble-sandbox`) | `sandbox-python/vX.Y.Z` |
+| `sandbox-go` | Go module proxy | `sandbox-go/vX.Y.Z` |
 
-```bash
-export PYPI_TOKEN=...   # PyPI API token with upload scope
-chmod +x scripts/publish-go-python.sh
-./scripts/publish-go-python.sh 0.1.4
-```
+The workflow sets the version in the package, runs its tests and build, publishes it, pushes a `chore(release)` commit with the tag to `main`, and creates a GitHub release with notes since the package's previous release.
 
-This script will:
+Repository setup (once):
 
-1. Bump `sandbox-go/constants.go` and `sandbox-python/pyproject.toml` to the given version
-2. Run `go test` and Python unit tests
-3. Commit the version bump
-4. Build and upload `brimble-sandbox` to PyPI via `twine`
-5. Create and push the `sandbox-go/v0.1.4` git tag (Go module release)
-
-Useful flags:
-
-```bash
-./scripts/publish-go-python.sh 0.1.4 --dry-run      # preview only
-./scripts/publish-go-python.sh 0.1.4 --skip-push      # tag locally, no git push
-./scripts/publish-go-python.sh 0.1.4 --skip-python    # Go tag only
-./scripts/publish-go-python.sh 0.1.4 --skip-go        # PyPI only
-./scripts/publish-go-python.sh 0.1.4 --no-commit      # do not auto-commit version files
-```
-
-Go consumers install with:
-
-```bash
-go get github.com/brimblehq/brimble-sdks/sandbox-go@v0.1.4
-```
-
-### TypeScript
-
-```bash
-cd sandbox
-yarn build
-yarn publish
-```
-
-### Python
-
-```bash
-cd sandbox-python
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -e '.[dev]' build twine
-python -m pytest -q
-python -m build
-python -m twine check dist/*
-python -m twine upload dist/*
-```
-
-### Go
-
-```bash
-cd sandbox-go
-go test ./...
-go build ./...
-```
-
-Then tag from repo root, for example:
-
-```bash
-git tag sandbox-go/v0.1.0
-git push origin sandbox-go/v0.1.0
-```
+- `release` environment (Settings → Environments), optionally with required reviewers.
+- `NPM_TOKEN` secret: npm automation token with publish access to `@brimble/sandbox`.
+- `PYPI_API_TOKEN` secret, or leave it unset and add this repo's `release.yml` / `release` environment as a trusted publisher on the `brimble-sandbox` PyPI project.

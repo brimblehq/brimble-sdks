@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to release: sandbox (TypeScript, npm), sandbox-python (PyPI) or sandbox-go (Go module)"
+        required: true
+        type: choice
+        options:
+          - sandbox
+          - sandbox-python
+          - sandbox-go
+      version:
+        description: "Version without the leading v, e.g. 0.1.7"
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      PACKAGE: ${{ inputs.package }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Validate version
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version must look like 1.2.3 or 1.2.3-rc.1, got '$VERSION'"
+            exit 1
+          fi
+          echo "TAG=$PACKAGE/v$VERSION" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check the tag is new and find the previous release
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+          PREVIOUS_TAG="$(git tag --list "$PACKAGE/v*" --sort=-v:refname | head -n 1)"
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        if: inputs.package == 'sandbox'
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: sandbox/package-lock.json
+
+      - uses: actions/setup-python@v5
+        if: inputs.package == 'sandbox-python'
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-go@v5
+        if: inputs.package == 'sandbox-go'
+        with:
+          go-version-file: sandbox-go/go.mod
+
+      - name: Set version and test (TypeScript)
+        if: inputs.package == 'sandbox'
+        working-directory: sandbox
+        run: |
+          npm version "$VERSION" --no-git-tag-version
+          npm ci
+          npm test
+          npm run build
+
+      - name: Set version and test (Python)
+        if: inputs.package == 'sandbox-python'
+        working-directory: sandbox-python
+        run: |
+          sed -i -E "s/^version = \"[^\"]+\"/version = \"$VERSION\"/" pyproject.toml
+          grep -q "^version = \"$VERSION\"" pyproject.toml
+          python -m pip install --upgrade pip build twine
+          python -m pip install -e ".[dev]" pytest
+          python -m pytest tests/unit -q
+          python -m build
+          python -m twine check dist/*
+
+      - name: Set version and test (Go)
+        if: inputs.package == 'sandbox-go'
+        working-directory: sandbox-go
+        run: |
+          sed -i -E "s/(SDKPackageVersion[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\1\"$VERSION\"/" constants.go
+          grep -q "\"$VERSION\"" constants.go
+          go vet ./...
+          go test ./...
+
+      - name: Commit the version bump and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A "$PACKAGE"
+          git commit -m "chore(release): $PACKAGE v$VERSION"
+          git tag -a "$TAG" -m "Release $PACKAGE v$VERSION"
+
+      - name: Publish to npm
+        if: inputs.package == 'sandbox'
+        working-directory: sandbox
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: Publish to PyPI
+        if: inputs.package == 'sandbox-python'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sandbox-python/dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Push the release commit and tag
+        run: git push --atomic origin HEAD:main "$TAG"
+
+      - name: Make the Go module version available
+        if: inputs.package == 'sandbox-go'
+        working-directory: sandbox-go
+        env:
+          GOPROXY: https://proxy.golang.org
+        run: go list -m "github.com/brimblehq/brimble-sdks/sandbox-go@v$VERSION"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--title "$PACKAGE v$VERSION" --generate-notes --verify-tag)
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            args+=(--notes-start-tag "$PREVIOUS_TAG")
+          fi
+          if [[ "$VERSION" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${args[@]}"
