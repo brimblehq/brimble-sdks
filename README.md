@@ -24,4 +24,4 @@ Repository setup (once):
 
 - `release` environment (Settings → Environments), optionally with required reviewers.
 - `NPM_TOKEN` secret: npm automation token with publish access to `@brimble/sandbox`.
-- `PYPI_API_TOKEN` secret, or leave it unset and add this repo's `release.yml` / `release` environment as a trusted publisher on the `brimble-sandbox` PyPI project.
+- `PYPI_TOKEN` secret, or leave it unset and add this repo's `release.yml` / `release` environment as a trusted publisher on the `brimble-sandbox` PyPI project.

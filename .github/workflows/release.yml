@@ -121,7 +121,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sandbox-python/dist
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          password: ${{ secrets.PYPI_TOKEN }}
 
       - name: Push the release commit and tag
         run: git push --atomic origin HEAD:main "$TAG"
