@@ -161,9 +161,7 @@ def _merge_retry_config(base: _RetryConfig, override: RetryOptions | bool | None
 def _can_retry_body(body: object | None) -> bool:
     if body is None:
         return True
-    if isinstance(body, (bytes, bytearray, str)):
-        return True
-    return False
+    return isinstance(body, (bytes, bytearray, str, dict, list, tuple, int, float, bool))
 
 
 def _compute_delay_ms(attempt: int, base_delay_ms: int, max_delay_ms: int) -> int:
